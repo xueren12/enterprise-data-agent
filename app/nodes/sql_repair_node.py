@@ -4,9 +4,11 @@ from app.state import AgentState
 
 
 def repair_sql_node(state: AgentState) -> AgentState:
+    repair_count = state.get("retry_count", 0) + 1
     result = repair_select_sql(
         question=state["user_question"],
         intent=state["intent"],
+        query_plan=state["query_plan"],
         original_sql=state["sql"],
         validation_error=state.get("sql_validation_error") or "SQL 未通过安全校验。",
     )
@@ -18,7 +20,7 @@ def repair_sql_node(state: AgentState) -> AgentState:
         tool_name="deepseek_sql_repair",
         tool_result_summary={
             "used_llm": result["used_llm"],
-            "retry_count": state.get("retry_count", 0),
+            "repair_count": repair_count,
         },
         error=None if result["used_llm"] else result["error"],
     )
@@ -27,4 +29,5 @@ def repair_sql_node(state: AgentState) -> AgentState:
         "sql": result["content"],
         "sql_validation_error": None,
         "error": None,
+        "retry_count": repair_count,
     }

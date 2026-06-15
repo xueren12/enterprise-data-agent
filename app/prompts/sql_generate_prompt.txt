@@ -18,3 +18,12 @@
 
 分析类型：
 {intent}
+
+必须查询的字段：
+{required_columns}
+
+必须应用的筛选条件：
+{filters}
+
+分析结果 TopN：
+{top_n}

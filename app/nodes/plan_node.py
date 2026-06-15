@@ -26,15 +26,8 @@ def generate_plan_node(state: AgentState) -> AgentState:
         error=None if plan_result["used_llm"] else plan_result["error"],
     )
     plan = plan_result["content"]
-    analysis_params = dict(plan.filters)
-    if plan.top_n is not None:
-        analysis_params["top_n"] = plan.top_n
-
     return {
         **state,
-        "intent": plan.intent,
-        "data_source_type": plan.data_source_type,
-        "analysis_params": analysis_params,
         "query_plan": plan.model_dump(),
         "error": None,
     }

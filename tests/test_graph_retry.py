@@ -1,5 +1,6 @@
 from app import graph as graph_module
 from app.config import SAMPLE_API_LOGS_PATH
+from app.nodes import sql_repair_node as sql_repair_module
 from app.services import llm_service
 from app.services.agent_service import build_initial_state
 
@@ -59,16 +60,15 @@ def test_postgresql_retries_once_then_succeeds(monkeypatch):
         lambda state: {**state, "sql": "SELECT * FROM api_call_logs", "error": None},
     )
 
-    def repair_sql(state):
-        repair_calls.append(state["retry_count"])
+    def repair_sql(**kwargs):
+        repair_calls.append(kwargs)
         return {
-            **state,
-            "sql": "SELECT department, status FROM api_call_logs LIMIT 20",
-            "sql_validation_error": None,
+            "used_llm": True,
+            "content": "SELECT department, status FROM api_call_logs LIMIT 20",
             "error": None,
         }
 
-    monkeypatch.setattr(graph_module, "repair_sql_node", repair_sql)
+    monkeypatch.setattr(sql_repair_module, "repair_select_sql", repair_sql)
     monkeypatch.setattr(
         graph_module,
         "execute_sql_node",
@@ -85,33 +85,36 @@ def test_postgresql_retries_once_then_succeeds(monkeypatch):
 
     assert result["error"] is None
     assert result["retry_count"] == 1
-    assert repair_calls == [1]
+    assert len(repair_calls) == 1
+    assert repair_calls[0]["original_sql"] == "SELECT * FROM api_call_logs"
     assert result["report"] == "测试报告"
 
 
-def test_postgresql_falls_back_after_two_validation_failures(monkeypatch):
+def test_postgresql_falls_back_after_two_real_repair_attempts(monkeypatch):
     _patch_common_graph_nodes(monkeypatch, "postgresql")
+    repair_calls = []
     monkeypatch.setattr(
         graph_module,
         "generate_sql_node",
         lambda state: {**state, "sql": "DELETE FROM api_call_logs", "error": None},
     )
-    monkeypatch.setattr(
-        graph_module,
-        "repair_sql_node",
-        lambda state: {
-            **state,
-            "sql": "SELECT * FROM api_call_logs",
-            "sql_validation_error": None,
+
+    def repair_sql(**kwargs):
+        repair_calls.append(kwargs)
+        return {
+            "used_llm": True,
+            "content": "SELECT * FROM api_call_logs",
             "error": None,
-        },
-    )
+        }
+
+    monkeypatch.setattr(sql_repair_module, "repair_select_sql", repair_sql)
 
     result = graph_module.build_graph().invoke(
         build_initial_state("统计各部门接口调用失败率")
     )
 
     assert result["retry_count"] == 2
+    assert len(repair_calls) == 2
     assert result["error"]
     assert "本次查询未获得有效结果" in result["report"]
 

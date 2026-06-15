@@ -10,6 +10,7 @@ from app.config import (
     DEEPSEEK_BASE_URL,
     DEEPSEEK_MODEL,
     PROMPT_DIR,
+    SQL_MAX_LIMIT,
 )
 from app.schemas.query_plan import QueryPlan, REQUIRED_COLUMNS_BY_ANALYSIS
 
@@ -96,18 +97,43 @@ def _extract_json_object(content: str) -> dict[str, Any]:
     return json.loads(cleaned[start : end + 1])
 
 
-def fallback_select_sql() -> str:
+def _escape_sql_literal(value: str) -> str:
+    return value.replace("'", "''")
+
+
+def fallback_select_sql(query_plan: QueryPlan | dict[str, Any]) -> str:
+    plan = QueryPlan.model_validate(query_plan)
+    columns = ", ".join(plan.required_columns)
+    clauses: list[str] = []
+
+    if days := plan.filters.get("days"):
+        clauses.append(
+            f"request_time >= CURRENT_TIMESTAMP - INTERVAL '{int(days)} days'"
+        )
+    for filter_name in ("department", "project_name", "api_name"):
+        if filter_name in plan.filters:
+            value = _escape_sql_literal(str(plan.filters[filter_name]))
+            clauses.append(f"{filter_name} = '{value}'")
+
+    where_clause = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     return (
-        "SELECT id, department, project_name, api_name, status, status_code, "
-        "latency_ms, request_time, error_message "
-        "FROM api_call_logs ORDER BY request_time DESC LIMIT 200"
+        f"SELECT {columns} FROM api_call_logs"
+        f"{where_clause} LIMIT {SQL_MAX_LIMIT}"
     )
 
 
-def generate_select_sql(question: str, intent: str) -> dict:
+def generate_select_sql(
+    question: str,
+    intent: str,
+    query_plan: QueryPlan | dict[str, Any],
+) -> dict:
+    plan = QueryPlan.model_validate(query_plan)
     prompt = read_prompt("sql_generate_prompt.txt").format(
         question=question,
         intent=intent,
+        required_columns=json.dumps(plan.required_columns, ensure_ascii=False),
+        filters=json.dumps(plan.filters, ensure_ascii=False, sort_keys=True),
+        top_n=plan.top_n,
     )
     try:
         content = call_deepseek(prompt, temperature=0)
@@ -116,7 +142,7 @@ def generate_select_sql(question: str, intent: str) -> dict:
     except Exception as exc:
         return {
             "used_llm": False,
-            "content": fallback_select_sql(),
+            "content": fallback_select_sql(plan),
             "error": str(exc),
         }
 
@@ -125,12 +151,17 @@ def repair_select_sql(
     *,
     question: str,
     intent: str,
+    query_plan: QueryPlan | dict[str, Any],
     original_sql: str,
     validation_error: str,
 ) -> dict:
+    plan = QueryPlan.model_validate(query_plan)
     prompt = read_prompt("sql_repair_prompt.txt").format(
         question=question,
         intent=intent,
+        required_columns=json.dumps(plan.required_columns, ensure_ascii=False),
+        filters=json.dumps(plan.filters, ensure_ascii=False, sort_keys=True),
+        top_n=plan.top_n,
         original_sql=original_sql,
         validation_error=validation_error,
     )
@@ -142,7 +173,7 @@ def repair_select_sql(
     except Exception as exc:
         return {
             "used_llm": False,
-            "content": fallback_select_sql(),
+            "content": fallback_select_sql(plan),
             "error": str(exc),
         }
 
@@ -169,6 +200,12 @@ def generate_query_plan(
         plan = QueryPlan.model_validate(_extract_json_object(content))
         if plan.data_source_type != data_source_type:
             raise ValueError("模型计划的数据源与系统已选择的数据源不一致。")
+        expected_params = dict(analysis_params or {})
+        expected_top_n = expected_params.pop("top_n", None)
+        if plan.intent != intent or plan.analysis_type != intent:
+            raise ValueError("模型计划不得覆盖规则解析出的意图。")
+        if plan.filters != expected_params or plan.top_n != expected_top_n:
+            raise ValueError("模型计划不得覆盖规则解析出的筛选参数。")
         return {"used_llm": True, "content": plan, "error": None}
     except Exception as exc:
         return {

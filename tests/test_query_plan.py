@@ -51,3 +51,34 @@ def test_generate_query_plan_falls_back_when_llm_json_is_invalid(monkeypatch):
     assert plan.data_source_type == "postgresql"
     assert plan.filters == {"days": 30}
     assert plan.required_columns == ["department", "status", "request_time"]
+
+
+def test_generate_query_plan_rejects_llm_overriding_rule_result(monkeypatch):
+    response = {
+        "intent": "average_latency",
+        "data_source_type": "csv",
+        "analysis_type": "average_latency",
+        "filters": {"department": "财务部"},
+        "top_n": 20,
+        "required_columns": ["api_name", "latency_ms", "department"],
+        "need_chart": True,
+        "need_report": True,
+    }
+    monkeypatch.setattr(
+        llm_service,
+        "call_deepseek",
+        lambda prompt, temperature=0.2: json.dumps(response, ensure_ascii=False),
+    )
+
+    result = llm_service.generate_query_plan(
+        "统计运维部失败率最高的接口 Top5",
+        "api_failure_topn",
+        "csv",
+        {"department": "运维部", "top_n": 5},
+    )
+
+    plan = result["content"]
+    assert result["used_llm"] is False
+    assert plan.intent == "api_failure_topn"
+    assert plan.filters == {"department": "运维部"}
+    assert plan.top_n == 5

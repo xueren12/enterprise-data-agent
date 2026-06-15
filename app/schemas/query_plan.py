@@ -60,7 +60,21 @@ class QueryPlan(BaseModel):
         unknown = set(value) - allowed_filters
         if unknown:
             raise ValueError(f"包含不支持的筛选条件：{', '.join(sorted(unknown))}")
-        return value
+
+        normalized = dict(value)
+        if "days" in normalized:
+            days = normalized["days"]
+            if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 3650:
+                raise ValueError("days 必须是 1 到 3650 的整数。")
+
+        for name in ("department", "project_name", "api_name"):
+            if name not in normalized:
+                continue
+            filter_value = normalized[name]
+            if not isinstance(filter_value, str) or not filter_value.strip():
+                raise ValueError(f"{name} 必须是非空字符串。")
+            normalized[name] = filter_value.strip()
+        return normalized
 
     @model_validator(mode="after")
     def validate_intent_matches_analysis(self) -> "QueryPlan":
@@ -72,5 +86,21 @@ class QueryPlan(BaseModel):
         if missing:
             raise ValueError(
                 f"required_columns 缺少分析必需字段：{', '.join(sorted(missing))}"
+            )
+        filter_columns = {
+            "days": "request_time",
+            "department": "department",
+            "project_name": "project_name",
+            "api_name": "api_name",
+        }
+        missing_filter_columns = {
+            filter_columns[name]
+            for name in self.filters
+            if filter_columns[name] not in self.required_columns
+        }
+        if missing_filter_columns:
+            raise ValueError(
+                "required_columns 缺少筛选所需字段："
+                f"{', '.join(sorted(missing_filter_columns))}"
             )
         return self
