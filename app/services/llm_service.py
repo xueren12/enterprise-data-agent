@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-
 from app.config import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
     DEEPSEEK_MODEL,
     PROMPT_DIR,
 )
+from app.schemas.query_plan import QueryPlan, REQUIRED_COLUMNS_BY_ANALYSIS
 
 
 def read_prompt(prompt_name: str) -> str:
@@ -52,24 +52,48 @@ def call_deepseek(prompt: str, temperature: float = 0.2) -> str:
     return data["choices"][0]["message"]["content"].strip()
 
 
-def fallback_query_plan(intent: str, data_source_type: str) -> str:
-    source_name = "PostgreSQL 数据库" if data_source_type == "postgresql" else "CSV 文件"
-    analysis_steps = {
-        "department_failure_rate": "按部门统计调用总数、失败数、成功数和失败率",
-        "api_failure_topn": "按接口统计失败率，并按失败率降序选取 TopN",
-        "average_latency": "按接口统计平均耗时和最大耗时，并按平均耗时降序排列",
-        "failure_trend": "按日期统计调用数、失败数和失败率，形成时间趋势",
-        "department_call_volume": "按部门统计接口调用总数并降序排列",
-        "department_call_volume_trend": "按日期和部门统计接口调用量变化",
+def fallback_query_plan(
+    intent: str,
+    data_source_type: str,
+    analysis_params: dict[str, Any] | None = None,
+) -> QueryPlan:
+    params = dict(analysis_params or {})
+    top_n = params.pop("top_n", None)
+    required_columns = sorted(REQUIRED_COLUMNS_BY_ANALYSIS[intent])
+    filter_columns = {
+        "days": "request_time",
+        "department": "department",
+        "project_name": "project_name",
+        "api_name": "api_name",
     }
-    analysis_step = analysis_steps.get(intent, "根据问题执行结构化数据分析")
-    return (
-        f"1. 从{source_name}读取企业接口调用日志。\n"
-        "2. 校验部门、接口、状态、耗时和请求时间等必要字段。\n"
-        f"3. 使用 Pandas {analysis_step}。\n"
-        "4. 校验分析结果是否为空以及指标是否可计算。\n"
-        "5. 生成对应图表和结构化分析报告。"
+    for filter_name in params:
+        column = filter_columns.get(filter_name)
+        if column and column not in required_columns:
+            required_columns.append(column)
+
+    return QueryPlan(
+        intent=intent,
+        data_source_type=data_source_type,
+        analysis_type=intent,
+        filters=params,
+        top_n=top_n,
+        required_columns=required_columns,
+        need_chart=True,
+        need_report=True,
     )
+
+
+def _extract_json_object(content: str) -> dict[str, Any]:
+    cleaned = content.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.removeprefix("```json").removeprefix("```")
+        cleaned = cleaned.removesuffix("```").strip()
+
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("模型响应中未找到 JSON 对象。")
+    return json.loads(cleaned[start : end + 1])
 
 
 def fallback_select_sql() -> str:
@@ -97,23 +121,59 @@ def generate_select_sql(question: str, intent: str) -> dict:
         }
 
 
-def generate_query_plan(
+def repair_select_sql(
+    *,
     question: str,
     intent: str,
-    data_source_type: str,
+    original_sql: str,
+    validation_error: str,
 ) -> dict:
-    prompt = read_prompt("query_plan_prompt.txt").format(
+    prompt = read_prompt("sql_repair_prompt.txt").format(
         question=question,
         intent=intent,
-        data_source_type=data_source_type,
+        original_sql=original_sql,
+        validation_error=validation_error,
     )
     try:
-        content = call_deepseek(prompt)
+        content = call_deepseek(prompt, temperature=0)
+        content = content.removeprefix("```sql").removeprefix("```")
+        content = content.removesuffix("```").strip()
         return {"used_llm": True, "content": content, "error": None}
     except Exception as exc:
         return {
             "used_llm": False,
-            "content": fallback_query_plan(intent, data_source_type),
+            "content": fallback_select_sql(),
+            "error": str(exc),
+        }
+
+
+def generate_query_plan(
+    question: str,
+    intent: str,
+    data_source_type: str,
+    analysis_params: dict[str, Any] | None = None,
+) -> dict:
+    fallback_plan = fallback_query_plan(intent, data_source_type, analysis_params)
+    prompt = read_prompt("query_plan_prompt.txt").format(
+        question=question,
+        intent=intent,
+        data_source_type=data_source_type,
+        analysis_params=json.dumps(
+            analysis_params or {},
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+    )
+    try:
+        content = call_deepseek(prompt)
+        plan = QueryPlan.model_validate(_extract_json_object(content))
+        if plan.data_source_type != data_source_type:
+            raise ValueError("模型计划的数据源与系统已选择的数据源不一致。")
+        return {"used_llm": True, "content": plan, "error": None}
+    except Exception as exc:
+        return {
+            "used_llm": False,
+            "content": fallback_plan,
             "error": str(exc),
         }
 

@@ -15,6 +15,6 @@ class AgentQueryResponse(BaseModel):
 class AgentTaskResponse(AgentQueryResponse):
     data_source: str | None = Field(default=None, description="实际使用的数据源。")
     intent: str | None = Field(default=None, description="识别出的分析意图。")
-    query_plan: str | None = Field(default=None, description="Agent 查询计划。")
+    query_plan: dict | None = Field(default=None, description="Agent 结构化查询计划。")
     sql: str | None = Field(default=None, description="数据库分支实际执行的 SQL。")
     updated_at: str | None = Field(default=None, description="任务最近更新时间。")
