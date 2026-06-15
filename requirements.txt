@@ -1,0 +1,12 @@
+pandas>=2.2.0
+matplotlib>=3.8.0
+langgraph>=0.2.0
+langchain-core>=1.4.0
+httpx>=0.28.0
+python-dotenv>=1.0.0
+SQLAlchemy>=2.0.0
+psycopg[binary]>=3.2.0
+sqlglot>=26.0.0
+pytest>=8.0.0
+fastapi>=0.115.0
+uvicorn>=0.34.0

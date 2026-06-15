@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+charts/*.png
+reports/*.md
+logs/*.jsonl
+logs/*.log
+data/tasks/*.json
