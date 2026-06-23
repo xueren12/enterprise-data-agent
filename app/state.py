@@ -10,8 +10,9 @@ class AgentState(TypedDict):
     data_source: str
     data_source_type: str
     analysis_params: dict
-    query_plan: str
+    query_plan: dict
     sql: str
+    sql_validation_error: str | None
     raw_data: list[dict]
     analysis_result: dict | list[dict]
     chart_path: str

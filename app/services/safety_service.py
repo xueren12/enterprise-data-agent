@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from sqlglot import exp, parse
 from sqlglot.errors import ParseError
@@ -30,6 +31,60 @@ class SqlValidationResult:
     is_safe: bool
     sql: str
     error: str | None = None
+
+
+def validate_sql_matches_plan(
+    sql: str,
+    *,
+    required_columns: list[str],
+    filters: dict[str, Any],
+) -> str | None:
+    try:
+        statement = parse(sql, read="postgres")[0]
+    except (ParseError, IndexError):
+        return "SQL 无法与查询计划进行一致性校验。"
+
+    selected_columns: set[str] = set()
+    for expression in statement.args.get("expressions") or []:
+        if isinstance(expression, exp.Column):
+            selected_columns.add(expression.name.lower())
+        selected_columns.update(
+            column.name.lower() for column in expression.find_all(exp.Column)
+        )
+
+    missing_columns = {
+        column.lower() for column in required_columns
+    } - selected_columns
+    if missing_columns:
+        return f"SQL 缺少查询计划要求的字段：{', '.join(sorted(missing_columns))}"
+
+    where = statement.args.get("where")
+    if filters and where is None:
+        return "SQL 缺少查询计划要求的筛选条件。"
+    if where is None:
+        return None
+
+    where_columns = {
+        column.name.lower() for column in where.find_all(exp.Column)
+    }
+    filter_columns = {
+        "days": "request_time",
+        "department": "department",
+        "project_name": "project_name",
+        "api_name": "api_name",
+    }
+    for filter_name, expected_value in filters.items():
+        column = filter_columns[filter_name]
+        if column not in where_columns:
+            return f"SQL 缺少筛选字段：{column}"
+
+        where_sql = where.sql(dialect="postgres")
+        if filter_name == "days":
+            if f"{expected_value} day" not in where_sql.lower():
+                return f"SQL 未正确应用最近 {expected_value} 天筛选。"
+        elif str(expected_value) not in where_sql:
+            return f"SQL 未正确应用筛选条件：{filter_name}"
+    return None
 
 
 def validate_select_sql(

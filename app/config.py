@@ -22,6 +22,7 @@ DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 DEFAULT_DATA_SOURCE = os.getenv("DEFAULT_DATA_SOURCE", "auto").lower()
 SQL_MAX_LIMIT = int(os.getenv("SQL_MAX_LIMIT", "200"))
+SQL_MAX_RETRIES = int(os.getenv("SQL_MAX_RETRIES", "2"))
 SQL_ALLOWED_TABLES = {"api_call_logs"}
 SQL_ALLOWED_COLUMNS = {
     "id",
