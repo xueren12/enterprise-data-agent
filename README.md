@@ -46,7 +46,7 @@
 
 项目新增统一数据目录，集中管理 `api_call_logs` 表、字段权限和指标口径，避免让 LLM 在提示词里猜字段、猜表名或猜可筛选条件。
 
-- `table_catalog.yaml` 定义表名、中文描述、字段含义、字段类型、是否允许查询、是否允许筛选、是否允许聚合和是否敏感。
+- `table_catalog.json` 定义表名、中文描述、字段含义、字段类型、是否允许查询、是否允许筛选、是否允许聚合和是否敏感。
 - `schema_registry.py` 负责加载数据目录，并向 SQL 校验提供表白名单、可查询字段、可筛选字段和敏感字段信息。
 - `field_resolver.py` 负责把 QueryPlan 中的筛选条件映射到真实字段，例如 `days` 对应 `request_time`。
 - `metric_registry.py` 统一管理指标口径，例如 `department_failure_rate` 需要 `department`、`status` 字段，允许哪些 filters，默认 TopN 是多少，是否生成图表和报告。

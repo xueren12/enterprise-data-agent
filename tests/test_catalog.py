@@ -36,6 +36,34 @@ def test_illegal_field_cannot_enter_query_plan():
         )
 
 
+def test_sensitive_catalog_field_cannot_enter_query_plan_required_columns():
+    with pytest.raises(ValidationError):
+        QueryPlan(
+            intent="department_failure_rate",
+            data_source_type="csv",
+            analysis_type="department_failure_rate",
+            filters={},
+            top_n=None,
+            required_columns=["department", "status", "error_message"],
+            need_chart=True,
+            need_report=True,
+        )
+
+
+def test_sensitive_catalog_field_cannot_enter_query_plan_filters():
+    with pytest.raises(ValidationError):
+        QueryPlan(
+            intent="department_failure_rate",
+            data_source_type="csv",
+            analysis_type="department_failure_rate",
+            filters={"error_message": "timeout"},
+            top_n=None,
+            required_columns=["department", "status"],
+            need_chart=True,
+            need_report=True,
+        )
+
+
 def test_sensitive_field_cannot_be_selected_by_sql():
     result = validate_select_sql(
         "SELECT error_message FROM api_call_logs LIMIT 20",

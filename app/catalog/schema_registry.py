@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
-CATALOG_PATH = Path(__file__).with_name("table_catalog.yaml")
+CATALOG_PATH = Path(__file__).with_name("table_catalog.json")
 
 
 @dataclass(frozen=True)

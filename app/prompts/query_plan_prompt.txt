@@ -20,6 +20,7 @@ JSON 必须包含：
 - required_columns 只能从数据目录允许查询字段中选择；
 - 不要编造字段；
 - need_chart 和 need_report 必须是布尔值。
+- 最终 QueryPlan 仍会经过系统数据目录和指标口径校验，模型不得覆盖系统解析结果。
 
 数据目录：
 {catalog_fields}
