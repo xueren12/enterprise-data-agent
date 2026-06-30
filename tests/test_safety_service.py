@@ -68,6 +68,13 @@ def test_rejects_unknown_column():
     assert "未授权的字段" in result.error
 
 
+def test_rejects_sensitive_column():
+    result = validate("SELECT error_message FROM api_call_logs")
+
+    assert result.is_safe is False
+    assert "敏感字段" in result.error
+
+
 def test_rejects_wildcard():
     result = validate("SELECT * FROM api_call_logs")
 

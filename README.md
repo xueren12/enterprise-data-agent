@@ -42,6 +42,17 @@
 - **图表和结构化报告生成**：Matplotlib 保存图表，报告包含分析目标、核心结论、数据依据、异常发现、业务建议和图表路径。
 - **TraceID 链路日志**：每次请求生成 `trace_id`，节点和工具调用写入 JSONL 日志，便于追踪和排错。
 
+## 数据目录 / Schema Registry
+
+项目新增统一数据目录，集中管理 `api_call_logs` 表、字段权限和指标口径，避免让 LLM 在提示词里猜字段、猜表名或猜可筛选条件。
+
+- `table_catalog.yaml` 定义表名、中文描述、字段含义、字段类型、是否允许查询、是否允许筛选、是否允许聚合和是否敏感。
+- `schema_registry.py` 负责加载数据目录，并向 SQL 校验提供表白名单、可查询字段、可筛选字段和敏感字段信息。
+- `field_resolver.py` 负责把 QueryPlan 中的筛选条件映射到真实字段，例如 `days` 对应 `request_time`。
+- `metric_registry.py` 统一管理指标口径，例如 `department_failure_rate` 需要 `department`、`status` 字段，允许哪些 filters，默认 TopN 是多少，是否生成图表和报告。
+- QueryPlan fallback 不再维护一份硬编码字段表，而是从 `metric_registry` 读取 required_columns，并通过 `field_resolver` 校验 filters。
+- SQL 安全校验不再信任模型输出字段，SELECT 字段必须 `allow_query=true`，WHERE 字段必须 `allow_filter=true`，敏感字段会被拒绝。
+
 ## 系统架构图
 
 ```mermaid

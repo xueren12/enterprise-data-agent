@@ -1,0 +1,91 @@
+{
+  "tables": {
+    "api_call_logs": {
+      "name": "api_call_logs",
+      "description": "企业接口调用日志表",
+      "fields": [
+        {
+          "name": "id",
+          "description": "日志主键 ID",
+          "type": "bigint",
+          "allow_query": true,
+          "allow_filter": false,
+          "allow_aggregate": false,
+          "sensitive": false
+        },
+        {
+          "name": "department",
+          "description": "部门名称",
+          "type": "string",
+          "allow_query": true,
+          "allow_filter": true,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "project_name",
+          "description": "项目名称",
+          "type": "string",
+          "allow_query": true,
+          "allow_filter": true,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "api_name",
+          "description": "接口名称",
+          "type": "string",
+          "allow_query": true,
+          "allow_filter": true,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "status",
+          "description": "调用状态，success 或 failed",
+          "type": "string",
+          "allow_query": true,
+          "allow_filter": true,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "status_code",
+          "description": "HTTP 状态码",
+          "type": "integer",
+          "allow_query": true,
+          "allow_filter": true,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "latency_ms",
+          "description": "接口响应耗时，单位毫秒",
+          "type": "integer",
+          "allow_query": true,
+          "allow_filter": false,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "request_time",
+          "description": "接口请求时间",
+          "type": "datetime",
+          "allow_query": true,
+          "allow_filter": true,
+          "allow_aggregate": true,
+          "sensitive": false
+        },
+        {
+          "name": "error_message",
+          "description": "错误信息，可能包含内部异常细节",
+          "type": "text",
+          "allow_query": false,
+          "allow_filter": false,
+          "allow_aggregate": false,
+          "sensitive": true
+        }
+      ]
+    }
+  }
+}

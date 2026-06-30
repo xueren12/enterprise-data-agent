@@ -3,6 +3,8 @@ import os
 
 from dotenv import load_dotenv
 
+from app.catalog.schema_registry import get_queryable_columns, list_queryable_tables
+
 
 load_dotenv()
 
@@ -23,15 +25,5 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 DEFAULT_DATA_SOURCE = os.getenv("DEFAULT_DATA_SOURCE", "auto").lower()
 SQL_MAX_LIMIT = int(os.getenv("SQL_MAX_LIMIT", "200"))
 SQL_MAX_RETRIES = int(os.getenv("SQL_MAX_RETRIES", "2"))
-SQL_ALLOWED_TABLES = {"api_call_logs"}
-SQL_ALLOWED_COLUMNS = {
-    "id",
-    "department",
-    "project_name",
-    "api_name",
-    "status",
-    "status_code",
-    "latency_ms",
-    "request_time",
-    "error_message",
-}
+SQL_ALLOWED_TABLES = list_queryable_tables()
+SQL_ALLOWED_COLUMNS = get_queryable_columns("api_call_logs")

@@ -7,6 +7,14 @@ from typing import Any
 from sqlglot import exp, parse
 from sqlglot.errors import ParseError
 
+from app.catalog.schema_registry import (
+    get_filterable_columns,
+    get_queryable_columns,
+    get_table,
+    is_sensitive_column,
+    list_queryable_tables,
+)
+from app.catalog.field_resolver import resolve_filter_field
 
 FORBIDDEN_SQL_KEYWORDS = {
     "DROP",
@@ -67,14 +75,8 @@ def validate_sql_matches_plan(
     where_columns = {
         column.name.lower() for column in where.find_all(exp.Column)
     }
-    filter_columns = {
-        "days": "request_time",
-        "department": "department",
-        "project_name": "project_name",
-        "api_name": "api_name",
-    }
     for filter_name, expected_value in filters.items():
-        column = filter_columns[filter_name]
+        column = resolve_filter_field(filter_name)
         if column not in where_columns:
             return f"SQL 缺少筛选字段：{column}"
 
@@ -90,8 +92,8 @@ def validate_sql_matches_plan(
 def validate_select_sql(
     sql: str,
     *,
-    allowed_tables: set[str],
-    allowed_columns: set[str],
+    allowed_tables: set[str] | None = None,
+    allowed_columns: set[str] | None = None,
     max_limit: int,
 ) -> SqlValidationResult:
     normalized_sql = sql.strip()
@@ -132,8 +134,12 @@ def validate_select_sql(
     if any(statement.find(node_type) for node_type in dangerous_nodes):
         return SqlValidationResult(False, "", "SQL 包含不允许执行的操作。")
 
+    catalog_tables = {name.lower() for name in list_queryable_tables()}
+    if allowed_tables is not None:
+        catalog_tables &= {name.lower() for name in allowed_tables}
+
     tables = {table.name.lower() for table in statement.find_all(exp.Table)}
-    unknown_tables = tables - {name.lower() for name in allowed_tables}
+    unknown_tables = tables - catalog_tables
     if unknown_tables:
         return SqlValidationResult(
             False,
@@ -142,6 +148,11 @@ def validate_select_sql(
         )
     if not tables:
         return SqlValidationResult(False, "", "SQL 必须查询白名单中的数据表。")
+    if len(tables) > 1:
+        return SqlValidationResult(False, "", "SQL 暂不支持跨表查询。")
+
+    table_name = next(iter(tables))
+    table = get_table(table_name)
 
     unsafe_stars = [
         star
@@ -155,13 +166,58 @@ def validate_select_sql(
             "SQL 不允许直接查询 *，请明确指定字段；COUNT(*) 聚合除外。",
         )
 
+    registered_columns = {name.lower() for name in table.fields}
+    queryable_columns = {name.lower() for name in get_queryable_columns(table_name)}
+    filterable_columns = {name.lower() for name in get_filterable_columns(table_name)}
+    if allowed_columns is not None:
+        queryable_columns &= {name.lower() for name in allowed_columns}
+
     columns = {column.name.lower() for column in statement.find_all(exp.Column)}
-    unknown_columns = columns - {name.lower() for name in allowed_columns}
+    unknown_columns = columns - registered_columns
     if unknown_columns:
         return SqlValidationResult(
             False,
             "",
             f"SQL 包含未授权的字段：{', '.join(sorted(unknown_columns))}",
+        )
+
+    sensitive_columns = {
+        column for column in columns if is_sensitive_column(table_name, column)
+    }
+    if sensitive_columns:
+        return SqlValidationResult(
+            False,
+            "",
+            f"SQL 包含敏感字段：{', '.join(sorted(sensitive_columns))}",
+        )
+
+    selected_columns: set[str] = set()
+    for expression in statement.args.get("expressions") or []:
+        if isinstance(expression, exp.Column):
+            selected_columns.add(expression.name.lower())
+        selected_columns.update(
+            column.name.lower() for column in expression.find_all(exp.Column)
+        )
+    disallowed_select_columns = selected_columns - queryable_columns
+    if disallowed_select_columns:
+        return SqlValidationResult(
+            False,
+            "",
+            "SQL 查询了不允许 SELECT 的字段："
+            f"{', '.join(sorted(disallowed_select_columns))}",
+        )
+
+    where = statement.args.get("where")
+    where_columns = {
+        column.name.lower() for column in where.find_all(exp.Column)
+    } if where is not None else set()
+    disallowed_filter_columns = where_columns - filterable_columns
+    if disallowed_filter_columns:
+        return SqlValidationResult(
+            False,
+            "",
+            "SQL 使用了不允许筛选的字段："
+            f"{', '.join(sorted(disallowed_filter_columns))}",
         )
 
     limit = statement.args.get("limit")

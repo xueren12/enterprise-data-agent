@@ -17,11 +17,12 @@ JSON 必须包含：
 - data_source_type 只能是 csv 或 postgresql；
 - filters 只能包含 days、department、project_name、api_name；
 - top_n 为 1 到 100 的整数或 null；
-- required_columns 只能从以下字段选择：
-  id, department, project_name, api_name, status, status_code,
-  latency_ms, request_time, error_message
+- required_columns 只能从数据目录允许查询字段中选择；
 - 不要编造字段；
 - need_chart 和 need_report 必须是布尔值。
+
+数据目录：
+{catalog_fields}
 
 用户问题：
 {question}

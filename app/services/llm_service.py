@@ -12,7 +12,14 @@ from app.config import (
     PROMPT_DIR,
     SQL_MAX_LIMIT,
 )
-from app.schemas.query_plan import QueryPlan, REQUIRED_COLUMNS_BY_ANALYSIS
+from app.catalog.field_resolver import (
+    columns_for_filters,
+    resolve_filter_field,
+    validate_filter_fields,
+)
+from app.catalog.metric_registry import get_metric_definition
+from app.catalog.schema_registry import get_queryable_columns, get_table
+from app.schemas.query_plan import QueryPlan
 
 
 def read_prompt(prompt_name: str) -> str:
@@ -60,27 +67,25 @@ def fallback_query_plan(
 ) -> QueryPlan:
     params = dict(analysis_params or {})
     top_n = params.pop("top_n", None)
-    required_columns = sorted(REQUIRED_COLUMNS_BY_ANALYSIS[intent])
-    filter_columns = {
-        "days": "request_time",
-        "department": "department",
-        "project_name": "project_name",
-        "api_name": "api_name",
-    }
-    for filter_name in params:
-        column = filter_columns.get(filter_name)
-        if column and column not in required_columns:
+    metric = get_metric_definition(intent)
+    filters = validate_filter_fields(
+        params,
+        allowed_filters=metric.allowed_filters,
+    )
+    required_columns = list(metric.required_columns)
+    for column in columns_for_filters(filters):
+        if column not in required_columns:
             required_columns.append(column)
 
     return QueryPlan(
         intent=intent,
         data_source_type=data_source_type,
         analysis_type=intent,
-        filters=params,
-        top_n=top_n,
+        filters=filters,
+        top_n=top_n or metric.default_top_n,
         required_columns=required_columns,
-        need_chart=True,
-        need_report=True,
+        need_chart=metric.need_chart,
+        need_report=metric.need_report,
     )
 
 
@@ -101,6 +106,20 @@ def _escape_sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _catalog_prompt_summary(table_name: str = "api_call_logs") -> str:
+    table = get_table(table_name)
+    queryable_columns = get_queryable_columns(table_name)
+    lines = [
+        f"表：{table.name}",
+        f"描述：{table.description}",
+        "允许查询字段：",
+    ]
+    for field_name, field in table.fields.items():
+        if field_name in queryable_columns:
+            lines.append(f"- {field_name}：{field.description}，类型 {field.type}")
+    return "\n".join(lines)
+
+
 def fallback_select_sql(query_plan: QueryPlan | dict[str, Any]) -> str:
     plan = QueryPlan.model_validate(query_plan)
     columns = ", ".join(plan.required_columns)
@@ -110,10 +129,12 @@ def fallback_select_sql(query_plan: QueryPlan | dict[str, Any]) -> str:
         clauses.append(
             f"request_time >= CURRENT_TIMESTAMP - INTERVAL '{int(days)} days'"
         )
-    for filter_name in ("department", "project_name", "api_name"):
-        if filter_name in plan.filters:
-            value = _escape_sql_literal(str(plan.filters[filter_name]))
-            clauses.append(f"{filter_name} = '{value}'")
+    for filter_name, filter_value in plan.filters.items():
+        if filter_name == "days":
+            continue
+        column = resolve_filter_field(filter_name)
+        value = _escape_sql_literal(str(filter_value))
+        clauses.append(f"{column} = '{value}'")
 
     where_clause = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     return (
@@ -131,6 +152,7 @@ def generate_select_sql(
     prompt = read_prompt("sql_generate_prompt.txt").format(
         question=question,
         intent=intent,
+        catalog_fields=_catalog_prompt_summary(),
         required_columns=json.dumps(plan.required_columns, ensure_ascii=False),
         filters=json.dumps(plan.filters, ensure_ascii=False, sort_keys=True),
         top_n=plan.top_n,
@@ -159,6 +181,7 @@ def repair_select_sql(
     prompt = read_prompt("sql_repair_prompt.txt").format(
         question=question,
         intent=intent,
+        catalog_fields=_catalog_prompt_summary(),
         required_columns=json.dumps(plan.required_columns, ensure_ascii=False),
         filters=json.dumps(plan.filters, ensure_ascii=False, sort_keys=True),
         top_n=plan.top_n,
@@ -189,6 +212,7 @@ def generate_query_plan(
         question=question,
         intent=intent,
         data_source_type=data_source_type,
+        catalog_fields=_catalog_prompt_summary(),
         analysis_params=json.dumps(
             analysis_params or {},
             ensure_ascii=False,

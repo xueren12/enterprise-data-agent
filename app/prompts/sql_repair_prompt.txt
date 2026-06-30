@@ -3,10 +3,8 @@
 请根据 SQL 安全校验错误，修复原 SQL 并输出一条 PostgreSQL SELECT 查询。
 
 严格约束：
-- 只允许查询 api_call_logs 表；
-- 只能使用以下字段：
-  id, department, project_name, api_name, status, status_code,
-  latency_ms, request_time, error_message
+- 只允许查询数据目录中的表；
+- 只能使用数据目录允许查询的字段；
 - 不允许使用 SELECT *；
 - 不允许生成 INSERT、UPDATE、DELETE、DDL、注释或多语句；
 - 查询原始明细数据，分析聚合由 Pandas 完成；
@@ -18,6 +16,9 @@
 
 分析类型：
 {intent}
+
+数据目录：
+{catalog_fields}
 
 必须查询的字段：
 {required_columns}
