@@ -5,9 +5,10 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://agent_user:agent_password@postgres:5432/agent_db
+      DATABASE_URL: postgresql+psycopg://agent_reader:agent_reader_password@postgres:5432/agent_db
       DEFAULT_DATA_SOURCE: postgresql
       SQL_MAX_RETRIES: 2
+      SQL_STATEMENT_TIMEOUT_MS: 5000
     ports:
       - "8000:8000"
     volumes:
@@ -24,15 +25,16 @@ services:
     container_name: enterprise-data-agent-postgres
     environment:
       POSTGRES_DB: agent_db
-      POSTGRES_USER: agent_user
-      POSTGRES_PASSWORD: agent_password
+      POSTGRES_USER: agent_owner
+      POSTGRES_PASSWORD: agent_owner_password
     ports:
       - "15432:5432"
     volumes:
       - agent_postgres_data:/var/lib/postgresql/data
       - ./data/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./data/sample_api_logs.csv:/docker-entrypoint-initdb.d/sample_api_logs.csv:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agent_user -d agent_db"]
+      test: ["CMD-SHELL", "pg_isready -U agent_owner -d agent_db"]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -91,3 +91,23 @@ def test_allows_count_wildcard():
     assert result.is_safe is True
     assert "COUNT(*)" in result.sql
     assert "LIMIT 100" in result.sql
+
+
+def test_rejects_aggregate_on_catalog_disallowed_column():
+    result = validate("SELECT AVG(id) FROM api_call_logs")
+
+    assert result.is_safe is False
+    assert "聚合" in result.error
+
+
+def test_allows_aggregate_on_catalog_allowed_column():
+    result = validate("SELECT AVG(latency_ms) FROM api_call_logs")
+
+    assert result.is_safe is True
+
+
+def test_rejects_sleep_function():
+    result = validate("SELECT pg_sleep(1), department FROM api_call_logs")
+
+    assert result.is_safe is False
+    assert "函数" in result.error

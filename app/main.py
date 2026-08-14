@@ -22,6 +22,24 @@ app = FastAPI(
 )
 
 
+def build_artifact_urls(
+    trace_id: str,
+    *,
+    has_report: bool,
+    has_chart: bool,
+) -> dict[str, str | None]:
+    return {
+        "task_url": f"/agent/task/{trace_id}",
+        "report_url": f"/agent/report/{trace_id}" if has_report else None,
+        "chart_url": f"/agent/chart/{trace_id}" if has_chart else None,
+    }
+
+
+@app.get("/health", include_in_schema=False)
+def health_check() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 def local_docs() -> str:
     return """
@@ -101,13 +119,45 @@ def local_docs() -> str:
         status.textContent = data.status === "success" ? "分析成功" : "分析失败";
         const meta = document.createElement("div");
         meta.className = "meta";
-        meta.innerHTML =
-          "<strong>追踪 ID</strong><span>" + data.trace_id + "</span>" +
-          "<strong>图表路径</strong><span>" + (data.chart_path || "无") + "</span>" +
-          "<strong>错误信息</strong><span>" + (data.error || "无") + "</span>";
+        const task = data.task_url
+          ? await fetch(data.task_url).then(item => item.json())
+          : {};
+        const details = {
+          trace_id: data.trace_id,
+          data_source: task.data_source || "无",
+          intent: task.intent || "无",
+          query_plan: task.query_plan || null,
+          sql: task.sql || null,
+          retry_count: task.retry_count || 0,
+          sql_validation_error: task.sql_validation_error || null,
+          analysis_result: task.analysis_result || []
+        };
+        const entries = [
+          ["追踪 ID", data.trace_id],
+          ["任务详情", data.task_url || "无"],
+          ["报告接口", data.report_url || "无"],
+          ["图表接口", data.chart_url || "无"],
+          ["错误信息", data.error || "无"]
+        ];
+        for (const [label, value] of entries) {
+          const key = document.createElement("strong");
+          const content = document.createElement("span");
+          key.textContent = label;
+          content.textContent = value;
+          meta.append(key, content);
+        }
         const report = document.createElement("pre");
         report.textContent = data.report || "没有生成报告。";
-        result.append(meta, report);
+        const execution = document.createElement("pre");
+        execution.textContent = JSON.stringify(details, null, 2);
+        result.append(meta, report, execution);
+        if (data.chart_url) {
+          const chart = document.createElement("img");
+          chart.src = data.chart_url;
+          chart.alt = "分析图表";
+          chart.style.cssText = "max-width: 100%; margin-top: 14px; border: 1px solid #dce2e8;";
+          result.append(chart);
+        }
       } catch (error) {
         status.className = "failed";
         status.textContent = "请求失败：" + error.message;
@@ -152,6 +202,14 @@ def query_agent(request: AgentQueryRequest) -> AgentQueryResponse:
             "intent": result.get("intent"),
             "query_plan": result.get("query_plan"),
             "sql": result.get("sql") or None,
+            "sql_validation_error": result.get("sql_validation_error"),
+            "retry_count": result.get("retry_count", 0),
+            "analysis_result": result.get("analysis_result") or [],
+            **build_artifact_urls(
+                result["trace_id"],
+                has_report=bool(result.get("report")),
+                has_chart=bool(result.get("chart_path")),
+            ),
         }
         save_task(task)
         return AgentQueryResponse(**task)
@@ -170,6 +228,11 @@ def query_agent(request: AgentQueryRequest) -> AgentQueryResponse:
             "report": None,
             "chart_path": None,
             "error": error,
+            **build_artifact_urls(
+                trace_id,
+                has_report=False,
+                has_chart=False,
+            ),
         }
         save_task(task)
         return AgentQueryResponse(**task)

@@ -12,7 +12,7 @@
 
 - 用结构化 `QueryPlan` 约束模型输出，减少自由文本不可控问题。
 - 用 LangGraph 多节点状态图编排完整 Agent 链路。
-- 对 PostgreSQL SQL 做只读安全校验、白名单限制和失败修复重试。
+- 对 PostgreSQL SQL 做只读安全校验、白名单限制、最小权限执行和失败修复重试。
 - 用 Pandas 完成失败率、TopN、趋势和响应时间分析。
 - 生成 Matplotlib 图表和结构化 Markdown 报告。
 - 用 TraceID 记录 Agent 执行链路日志。
@@ -36,7 +36,8 @@
 
 - **结构化 QueryPlan 约束模型输出**：DeepSeek 优先返回 JSON，Pydantic 校验失败后自动回退到确定性规则。
 - **LangGraph 多节点状态图编排**：解析、选源、计划、工具调用、SQL 校验、SQL 修复、分析、报告、兜底节点职责清晰。
-- **PostgreSQL SQL 安全校验**：只允许单条 `SELECT`，限制表白名单、字段白名单、`LIMIT`，禁止 DDL / DML、多语句、注释绕过和普通 `SELECT *`。
+- **PostgreSQL SQL 安全校验**：只允许单条 `SELECT`，限制表、字段、聚合字段和 `LIMIT`，禁止 DDL / DML、多语句、注释绕过、普通 `SELECT *` 与 `pg_sleep` 等高风险函数。
+- **数据库纵深防护**：Docker 中应用使用仅具 `SELECT` 权限的 `agent_reader` 账号；SQLAlchemy 连接还会开启只读事务和语句超时。
 - **SQL 生成失败修复重试**：SQL 校验失败后把原 SQL 和错误原因反馈给模型，最多修复 2 次，仍失败进入 fallback。
 - **Pandas 数据分析**：CSV 和 PostgreSQL 明细数据统一进入 Pandas，复用失败率、TopN、趋势和平均耗时分析逻辑。
 - **图表和结构化报告生成**：Matplotlib 保存图表，报告包含分析目标、核心结论、数据依据、异常发现、业务建议和图表路径。
@@ -51,7 +52,13 @@
 - `field_resolver.py` 负责把 QueryPlan 中的筛选条件映射到真实字段，例如 `days` 对应 `request_time`。
 - `metric_registry.py` 统一管理指标口径，例如 `department_failure_rate` 需要 `department`、`status` 字段，允许哪些 filters，默认 TopN 是多少，是否生成图表和报告。
 - QueryPlan fallback 不再维护一份硬编码字段表，而是从 `metric_registry` 读取 required_columns，并通过 `field_resolver` 校验 filters。
-- SQL 安全校验不再信任模型输出字段，SELECT 字段必须 `allow_query=true`，WHERE 字段必须 `allow_filter=true`，敏感字段会被拒绝。
+- SQL 安全校验不再信任模型输出字段，SELECT 字段必须 `allow_query=true`，WHERE 字段必须 `allow_filter=true`，聚合字段必须 `allow_aggregate=true`，敏感字段会被拒绝。
+
+## 合成数据与可复现性
+
+- `data/sample_api_logs.csv` 是完全合成的企业接口日志，共 40 条记录，不包含真实用户、客户或生产系统数据。
+- Docker PostgreSQL 通过 `COPY` 直接加载该 CSV，避免 CSV 分支与数据库分支使用不同样例数据。
+- [可复现评测说明](docs/evaluation_report.md) 固定包含 150 条支持问题和 12 条异常问题，并区分 QueryPlan、SQL 校验、SQL 实际执行和 fallback 指标。
 
 ## 系统架构图
 
@@ -100,11 +107,11 @@ flowchart TD
 
 ```powershell
 cd C:\Users\64789\Desktop\Agent
-python -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python run_demo.py
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 访问：
@@ -127,6 +134,8 @@ docker compose up -d
 http://localhost:8000/docs
 ```
 
+首次启动会把 `data/sample_api_logs.csv` 导入 PostgreSQL。升级初始化数据或角色后，可执行 `docker compose down -v` 后重新 `up -d`；这只会重建项目的合成演示数据。
+
 ## 环境变量说明
 
 | 变量 | 示例值 | 说明 |
@@ -134,10 +143,11 @@ http://localhost:8000/docs
 | `DEEPSEEK_API_KEY` | `your_api_key` | DeepSeek API Key，留空时走本地规则 fallback |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API 地址 |
 | `DEEPSEEK_MODEL` | `deepseek-chat` | DeepSeek 模型名称 |
-| `DATABASE_URL` | `postgresql+psycopg://agent_user:agent_password@localhost:15432/agent_db` | PostgreSQL 连接地址 |
+| `DATABASE_URL` | `postgresql+psycopg://agent_reader:agent_reader_password@localhost:15432/agent_db` | PostgreSQL 只读账号连接地址 |
 | `DEFAULT_DATA_SOURCE` | `auto` | 数据源选择策略：`auto` / `csv` / `postgresql` |
 | `SQL_MAX_LIMIT` | `200` | SQL 查询最大 LIMIT |
 | `SQL_MAX_RETRIES` | `2` | SQL 修复最大次数 |
+| `SQL_STATEMENT_TIMEOUT_MS` | `5000` | 数据库单条 SQL 最长执行时间（毫秒） |
 
 ## 示例问题
 
@@ -156,7 +166,10 @@ http://localhost:8000/docs
   "question": "统计各部门接口调用失败率，并生成分析报告",
   "status": "success",
   "report": "## 分析目标\n统计各部门接口调用失败率，并生成分析报告\n\n## 核心结论\n...",
-  "chart_path": "C:\\Users\\64789\\Desktop\\Agent\\charts\\a1b2c3d4e5f6_department_failure_rate.png",
+  "chart_path": "/app/charts/a1b2c3d4e5f6_department_failure_rate.png",
+  "task_url": "/agent/task/a1b2c3d4e5f6",
+  "report_url": "/agent/report/a1b2c3d4e5f6",
+  "chart_url": "/agent/chart/a1b2c3d4e5f6",
   "error": null
 }
 ```
@@ -166,6 +179,7 @@ http://localhost:8000/docs
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `GET` | `/docs` | 本地 Web Demo 页面 |
+| `GET` | `/health` | 服务健康检查 |
 | `POST` | `/agent/query` | 提交自然语言数据分析问题 |
 | `GET` | `/agent/task/{task_id}` | 查询任务状态和完整结果 |
 | `GET` | `/agent/report/{task_id}` | 获取任务分析报告 |
@@ -182,7 +196,7 @@ curl -X POST "http://localhost:8000/agent/query" \
 ## 测试方式
 
 ```powershell
-pytest
+py -3.11 -m pytest -q
 ```
 
 当前测试覆盖：
@@ -194,6 +208,23 @@ pytest
 - Pandas 分析函数
 - FastAPI 接口响应
 - 完整 LangGraph 主流程
+- 数据目录与敏感字段防护
+- 聚合字段、危险函数、只读 SQL 安全规则
+- 150 条离线评测集和 12 条异常兜底评测
+
+### 可复现评测
+
+```powershell
+# QueryPlan、SQL 校验和 fallback
+py -3.11 evaluation/run_evaluation.py
+
+# PostgreSQL 真实 SQL 执行率
+docker compose up -d postgres
+py -3.11 evaluation/run_evaluation.py `
+  --database-url "postgresql+psycopg://agent_reader:agent_reader_password@localhost:15432/agent_db"
+```
+
+评测结果和指标定义见 [docs/evaluation_report.md](docs/evaluation_report.md)。
 
 ## 项目截图
 
@@ -209,12 +240,20 @@ pytest
 
 ![图表和报告](docs/images/chart_report.png)
 
+### 真实接口流程
+
+![真实接口流程](docs/images/agent_demo.gif)
+
 ## 后续优化
 
 - 引入异步任务队列，支持长耗时分析任务。
 - 接入更细粒度的数据权限和用户认证。
 - 扩展多表查询、字段语义映射和数据目录管理。
-- 增加真实 PostgreSQL 集成测试和 CI 数据库服务。
+- 增加多表权限、行级权限和审计策略。
 - 接入日志平台、指标监控和告警。
 - 支持更多图表类型和报告导出格式。
 - 将 Web Demo 升级为更完整的运营分析控制台。
+
+## 开源协议
+
+本项目采用 [MIT License](LICENSE)。

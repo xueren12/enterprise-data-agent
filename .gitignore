@@ -7,3 +7,7 @@ reports/*.md
 logs/*.jsonl
 logs/*.log
 data/tasks/*.json
+docs/images/agent_demo_before.png
+docs/images/agent_demo_after.png
+evaluation/results/latest.json
+evaluation/results/ci-postgresql.json

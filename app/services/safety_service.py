@@ -8,6 +8,7 @@ from sqlglot import exp, parse
 from sqlglot.errors import ParseError
 
 from app.catalog.schema_registry import (
+    get_aggregatable_columns,
     get_filterable_columns,
     get_queryable_columns,
     get_table,
@@ -31,6 +32,16 @@ FORBIDDEN_SQL_KEYWORDS = {
     "MERGE",
     "CALL",
     "COPY",
+}
+
+FORBIDDEN_SQL_FUNCTIONS = {
+    "PG_SLEEP",
+    "PG_READ_FILE",
+    "PG_READ_BINARY_FILE",
+    "PG_LS_DIR",
+    "PG_STAT_FILE",
+    "LO_EXPORT",
+    "DBLINK",
 }
 
 
@@ -169,6 +180,9 @@ def validate_select_sql(
     registered_columns = {name.lower() for name in table.fields}
     queryable_columns = {name.lower() for name in get_queryable_columns(table_name)}
     filterable_columns = {name.lower() for name in get_filterable_columns(table_name)}
+    aggregatable_columns = {
+        name.lower() for name in get_aggregatable_columns(table_name)
+    }
     if allowed_columns is not None:
         queryable_columns &= {name.lower() for name in allowed_columns}
 
@@ -189,6 +203,33 @@ def validate_select_sql(
             False,
             "",
             f"SQL 包含敏感字段：{', '.join(sorted(sensitive_columns))}",
+        )
+
+    forbidden_functions = {
+        function.name.upper()
+        for function in statement.find_all(exp.Func)
+        if function.name.upper() in FORBIDDEN_SQL_FUNCTIONS
+    }
+    if forbidden_functions:
+        return SqlValidationResult(
+            False,
+            "",
+            "SQL 包含不允许调用的数据库函数："
+            f"{', '.join(sorted(forbidden_functions))}",
+        )
+
+    aggregate_columns = {
+        column.name.lower()
+        for aggregate in statement.find_all(exp.AggFunc)
+        for column in aggregate.find_all(exp.Column)
+    }
+    disallowed_aggregate_columns = aggregate_columns - aggregatable_columns
+    if disallowed_aggregate_columns:
+        return SqlValidationResult(
+            False,
+            "",
+            "SQL 聚合使用了数据目录未授权的字段："
+            f"{', '.join(sorted(disallowed_aggregate_columns))}",
         )
 
     selected_columns: set[str] = set()

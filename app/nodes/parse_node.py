@@ -53,7 +53,10 @@ def parse_question_node(state: AgentState) -> AgentState:
         and any(word in question for word in ("趋势", "变化", "走势", "按天", "每日"))
     ):
         intent = "department_call_volume_trend"
-    elif any(word in question for word in ("趋势", "走势", "按天", "每日")):
+    elif (
+        any(word in question for word in ("趋势", "走势", "按天", "每日"))
+        and any(word in question for word in ("失败", "失败率"))
+    ):
         intent = "failure_trend"
     elif any(word in question for word in ("响应时间", "平均耗时", "延迟", "耗时")):
         intent = "average_latency"

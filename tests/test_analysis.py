@@ -75,6 +75,13 @@ def test_parse_top_n():
     assert result["analysis_params"]["top_n"] == 5
 
 
+def test_parse_unrelated_trend_question_uses_fallback():
+    result = parse_question_node(base_state("分析股票价格走势"))
+
+    assert result["intent"] == "unknown"
+    assert result["error"] is not None
+
+
 def test_all_analysis_types_return_results():
     frame = pd.DataFrame(SAMPLE_ROWS)
 
@@ -94,6 +101,21 @@ def test_failure_trend_is_sorted_by_date():
     result = analyze_api_logs(pd.DataFrame(SAMPLE_ROWS), "failure_trend")
 
     assert [row["date"] for row in result] == ["2026-05-01", "2026-05-02"]
+
+
+def test_failure_trend_accepts_its_minimum_query_plan_columns():
+    rows = pd.DataFrame(
+        [
+            {"status": "failed", "request_time": "2026-05-01 10:00:00"},
+            {"status": "success", "request_time": "2026-05-01 11:00:00"},
+        ]
+    )
+
+    result = analyze_api_logs(rows, "failure_trend")
+
+    assert result == [
+        {"date": "2026-05-01", "total_calls": 2, "failed_calls": 1, "failure_rate": 50.0}
+    ]
 
 
 def test_days_and_department_filters():

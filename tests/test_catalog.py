@@ -19,7 +19,7 @@ def test_metric_registry_returns_department_failure_rate_columns():
     metric = get_metric_definition("department_failure_rate")
 
     assert metric.display_name == "各部门接口调用失败率"
-    assert metric.required_columns == ["department", "status"]
+    assert metric.required_columns == ["department", "status", "latency_ms"]
 
 
 def test_illegal_field_cannot_enter_query_plan():
@@ -30,7 +30,7 @@ def test_illegal_field_cannot_enter_query_plan():
             analysis_type="department_failure_rate",
             filters={},
             top_n=None,
-            required_columns=["department", "status", "password"],
+            required_columns=["department", "status", "latency_ms", "password"],
             need_chart=True,
             need_report=True,
         )
@@ -44,7 +44,12 @@ def test_sensitive_catalog_field_cannot_enter_query_plan_required_columns():
             analysis_type="department_failure_rate",
             filters={},
             top_n=None,
-            required_columns=["department", "status", "error_message"],
+            required_columns=[
+                "department",
+                "status",
+                "latency_ms",
+                "error_message",
+            ],
             need_chart=True,
             need_report=True,
         )
@@ -58,7 +63,7 @@ def test_sensitive_catalog_field_cannot_enter_query_plan_filters():
             analysis_type="department_failure_rate",
             filters={"error_message": "timeout"},
             top_n=None,
-            required_columns=["department", "status"],
+            required_columns=["department", "status", "latency_ms"],
             need_chart=True,
             need_report=True,
         )

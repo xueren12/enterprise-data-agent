@@ -12,33 +12,54 @@ SUPPORTED_ANALYSIS_TYPES = {
     "department_call_volume_trend",
 }
 
+ANALYSIS_REQUIRED_COLUMNS = {
+    "department_failure_rate": {"department", "status", "latency_ms"},
+    "api_failure_topn": {"api_name", "status", "latency_ms"},
+    "average_latency": {"api_name", "status", "latency_ms"},
+    "failure_trend": {"request_time", "status"},
+    "department_call_volume": {"department", "status"},
+    "department_call_volume_trend": {"request_time", "department", "status"},
+}
 
-def _prepare_logs(df: pd.DataFrame) -> pd.DataFrame:
+
+def _prepare_logs(
+    df: pd.DataFrame,
+    analysis_type: str,
+    *,
+    days: int | None,
+    department: str | None,
+    project_name: str | None,
+    api_name: str | None,
+) -> pd.DataFrame:
     if df.empty:
         raise ValueError("没有可用于分析的数据。")
 
-    required_columns = {
-        "department",
-        "project_name",
-        "api_name",
-        "status",
-        "latency_ms",
-        "request_time",
-    }
+    required_columns = set(ANALYSIS_REQUIRED_COLUMNS[analysis_type])
+    if days is not None:
+        required_columns.add("request_time")
+    if department:
+        required_columns.add("department")
+    if project_name:
+        required_columns.add("project_name")
+    if api_name:
+        required_columns.add("api_name")
     missing_columns = required_columns - set(df.columns)
     if missing_columns:
         missing = ", ".join(sorted(missing_columns))
         raise ValueError(f"分析数据缺少必要字段：{missing}")
 
     normalized = df.copy()
-    normalized["status"] = normalized["status"].astype(str).str.lower().str.strip()
-    normalized["latency_ms"] = pd.to_numeric(
-        normalized["latency_ms"], errors="coerce"
-    )
-    normalized["request_time"] = pd.to_datetime(
-        normalized["request_time"], errors="coerce"
-    )
-    normalized["is_failed"] = normalized["status"].eq("failed")
+    if "status" in normalized:
+        normalized["status"] = normalized["status"].astype(str).str.lower().str.strip()
+        normalized["is_failed"] = normalized["status"].eq("failed")
+    if "latency_ms" in normalized:
+        normalized["latency_ms"] = pd.to_numeric(
+            normalized["latency_ms"], errors="coerce"
+        )
+    if "request_time" in normalized:
+        normalized["request_time"] = pd.to_datetime(
+            normalized["request_time"], errors="coerce"
+        )
     return normalized
 
 
@@ -81,7 +102,14 @@ def analyze_api_logs(
     if analysis_type not in SUPPORTED_ANALYSIS_TYPES:
         raise ValueError(f"不支持的分析类型：{analysis_type}")
 
-    logs = _prepare_logs(df)
+    logs = _prepare_logs(
+        df,
+        analysis_type,
+        days=days,
+        department=department,
+        project_name=project_name,
+        api_name=api_name,
+    )
     if days is not None:
         latest_time = logs["request_time"].max()
         if pd.notna(latest_time):

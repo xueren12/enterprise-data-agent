@@ -18,7 +18,7 @@ METRIC_REGISTRY: dict[str, MetricDefinition] = {
     "department_failure_rate": MetricDefinition(
         name="department_failure_rate",
         display_name="各部门接口调用失败率",
-        required_columns=["department", "status"],
+        required_columns=["department", "status", "latency_ms"],
         allowed_filters={"days", "department", "project_name", "api_name"},
         default_top_n=None,
         need_chart=True,
@@ -27,7 +27,7 @@ METRIC_REGISTRY: dict[str, MetricDefinition] = {
     "api_failure_topn": MetricDefinition(
         name="api_failure_topn",
         display_name="高失败率接口 TopN",
-        required_columns=["api_name", "status"],
+        required_columns=["api_name", "status", "latency_ms"],
         allowed_filters={"days", "department", "project_name", "api_name"},
         default_top_n=10,
         need_chart=True,
@@ -36,7 +36,7 @@ METRIC_REGISTRY: dict[str, MetricDefinition] = {
     "average_latency": MetricDefinition(
         name="average_latency",
         display_name="接口平均响应时间",
-        required_columns=["api_name", "latency_ms"],
+        required_columns=["api_name", "status", "latency_ms"],
         allowed_filters={"days", "department", "project_name", "api_name"},
         default_top_n=10,
         need_chart=True,
@@ -54,7 +54,7 @@ METRIC_REGISTRY: dict[str, MetricDefinition] = {
     "department_call_volume": MetricDefinition(
         name="department_call_volume",
         display_name="各部门接口调用量",
-        required_columns=["department"],
+        required_columns=["department", "status"],
         allowed_filters={"days", "department", "project_name", "api_name"},
         default_top_n=None,
         need_chart=True,
@@ -63,7 +63,7 @@ METRIC_REGISTRY: dict[str, MetricDefinition] = {
     "department_call_volume_trend": MetricDefinition(
         name="department_call_volume_trend",
         display_name="各部门接口调用量变化",
-        required_columns=["request_time", "department"],
+        required_columns=["request_time", "department", "status"],
         allowed_filters={"days", "department", "project_name", "api_name"},
         default_top_n=None,
         need_chart=True,

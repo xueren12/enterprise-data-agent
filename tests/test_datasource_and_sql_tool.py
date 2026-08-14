@@ -25,7 +25,7 @@ def state(question: str) -> dict:
 def test_explicit_database_question_routes_to_postgresql(monkeypatch):
     monkeypatch.setattr(
         "app.nodes.datasource_node.DATABASE_URL",
-        "postgresql+psycopg://agent_user@localhost/agent_db",
+        "postgresql+psycopg://agent_reader@localhost/agent_db",
     )
 
     result = select_datasource_node(state("从 PostgreSQL 数据库统计失败率"))

@@ -25,14 +25,15 @@ def test_query_agent_success(monkeypatch):
 
     assert response.status_code == 200
     body = response.json()
-    assert body == {
-        "trace_id": body["trace_id"],
-        "question": "统计各部门接口调用失败率",
-        "status": "success",
-        "report": "测试分析报告",
-        "chart_path": "charts/test.png",
-        "error": None,
-    }
+    assert body["trace_id"]
+    assert body["question"] == "统计各部门接口调用失败率"
+    assert body["status"] == "success"
+    assert body["report"] == "测试分析报告"
+    assert body["chart_path"] == "charts/test.png"
+    assert body["error"] is None
+    assert body["task_url"] == f"/agent/task/{body['trace_id']}"
+    assert body["report_url"] == f"/agent/report/{body['trace_id']}"
+    assert body["chart_url"] == f"/agent/chart/{body['trace_id']}"
 
 
 def test_query_agent_failed(monkeypatch):
@@ -57,6 +58,9 @@ def test_query_agent_failed(monkeypatch):
     assert body["status"] == "failed"
     assert body["chart_path"] is None
     assert body["error"] == "暂时只支持接口调用失败率分析。"
+    assert body["task_url"] == f"/agent/task/{body['trace_id']}"
+    assert body["report_url"] == f"/agent/report/{body['trace_id']}"
+    assert body["chart_url"] is None
 
 
 def test_query_agent_rejects_blank_question():
@@ -92,3 +96,10 @@ def test_get_unknown_task_returns_404(monkeypatch):
     response = client.get("/agent/task/missing")
 
     assert response.status_code == 404
+
+
+def test_health_check_returns_ok():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

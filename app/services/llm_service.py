@@ -127,7 +127,8 @@ def fallback_select_sql(query_plan: QueryPlan | dict[str, Any]) -> str:
 
     if days := plan.filters.get("days"):
         clauses.append(
-            f"request_time >= CURRENT_TIMESTAMP - INTERVAL '{int(days)} days'"
+            "request_time >= (SELECT MAX(request_time) FROM api_call_logs) "
+            f"- INTERVAL '{int(days)} days'"
         )
     for filter_name, filter_value in plan.filters.items():
         if filter_name == "days":

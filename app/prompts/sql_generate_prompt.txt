@@ -8,6 +8,7 @@
 - 不允许使用 SELECT *；
 - 不允许生成 INSERT、UPDATE、DELETE、DDL、注释或多语句；
 - 查询原始明细数据，分析聚合由 Pandas 完成；
+- 当 filters 中存在 days 时，时间范围必须以 api_call_logs 表内 MAX(request_time) 为锚点，不能使用服务器当前时间；
 - 必须包含 LIMIT，最大 200；
 - 只输出 SQL，不要输出解释或 Markdown 代码块。
 

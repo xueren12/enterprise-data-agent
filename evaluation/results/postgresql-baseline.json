@@ -1,0 +1,26 @@
+{
+  "mode": "offline_deterministic_with_postgresql",
+  "generated_at": "2026-08-14T10:00:06.576318+00:00",
+  "query_plan": {
+    "total": 150,
+    "success": 150,
+    "success_rate": 100.0
+  },
+  "sql_validation": {
+    "total": 150,
+    "success": 150,
+    "success_rate": 100.0
+  },
+  "sql_execution": {
+    "attempted": 150,
+    "success": 150,
+    "success_rate": 100.0,
+    "skipped": false
+  },
+  "fallback": {
+    "total": 12,
+    "success": 12,
+    "success_rate": 100.0
+  },
+  "failures": []
+}

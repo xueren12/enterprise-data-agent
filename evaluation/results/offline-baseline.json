@@ -1,0 +1,26 @@
+{
+  "mode": "offline_deterministic",
+  "generated_at": "2026-08-14T09:39:20.672272+00:00",
+  "query_plan": {
+    "total": 150,
+    "success": 150,
+    "success_rate": 100.0
+  },
+  "sql_validation": {
+    "total": 150,
+    "success": 150,
+    "success_rate": 100.0
+  },
+  "sql_execution": {
+    "attempted": 0,
+    "success": 0,
+    "success_rate": 0.0,
+    "skipped": true
+  },
+  "fallback": {
+    "total": 12,
+    "success": 12,
+    "success_rate": 100.0
+  },
+  "failures": []
+}

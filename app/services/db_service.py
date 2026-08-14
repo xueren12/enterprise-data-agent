@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config import DATABASE_URL
+from app.config import DATABASE_URL, SQL_STATEMENT_TIMEOUT_MS
 
 
 class DatabaseServiceError(RuntimeError):
@@ -32,8 +32,17 @@ def execute_select(sql: str) -> list[dict]:
     try:
         engine = get_engine()
         with engine.connect() as connection:
-            result = connection.execute(text(sql))
-            return [dict(row) for row in result.mappings().all()]
+            with connection.begin():
+                # SQL 校验之外，再由数据库事务保证本次连接只读并限制耗时。
+                connection.execute(text("SET TRANSACTION READ ONLY"))
+                connection.execute(
+                    text(
+                        "SET LOCAL statement_timeout = "
+                        f"{max(1, SQL_STATEMENT_TIMEOUT_MS)}"
+                    )
+                )
+                result = connection.execute(text(sql))
+                return [dict(row) for row in result.mappings().all()]
     except DatabaseServiceError:
         raise
     except SQLAlchemyError as exc:

@@ -10,7 +10,7 @@ def test_generate_query_plan_uses_valid_structured_llm_output(monkeypatch):
         "analysis_type": "api_failure_topn",
         "filters": {"department": "运维部"},
         "top_n": 5,
-        "required_columns": ["api_name", "status", "department"],
+        "required_columns": ["api_name", "status", "latency_ms", "department"],
         "need_chart": True,
         "need_report": True,
     }
@@ -50,7 +50,12 @@ def test_generate_query_plan_falls_back_when_llm_json_is_invalid(monkeypatch):
     assert plan.intent == "department_failure_rate"
     assert plan.data_source_type == "postgresql"
     assert plan.filters == {"days": 30}
-    assert plan.required_columns == ["department", "status", "request_time"]
+    assert plan.required_columns == [
+        "department",
+        "status",
+        "latency_ms",
+        "request_time",
+    ]
 
 
 def test_generate_query_plan_rejects_llm_overriding_rule_result(monkeypatch):
