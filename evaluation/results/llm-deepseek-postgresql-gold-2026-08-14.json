@@ -1,0 +1,59 @@
+{
+  "mode": "llm_query_plan_with_postgresql",
+  "generated_at": "2026-08-14T14:28:17.270326+00:00",
+  "model": "DeepSeek API（由当前环境变量 DEEPSEEK_MODEL 指定）",
+  "dataset": "evaluation/datasets/query_plan_gold.jsonl",
+  "model_query_plan_validation": {
+    "total": 24,
+    "success": 24,
+    "success_rate": 100.0
+  },
+  "semantic_match_to_human_gold": {
+    "total": 24,
+    "success": 18,
+    "success_rate": 75.0
+  },
+  "controlled_sql_validation_after_semantic_match": {
+    "total": 18,
+    "success": 18,
+    "success_rate": 100.0
+  },
+  "controlled_sql_execution_after_semantic_match": {
+    "attempted": 18,
+    "success": 18,
+    "success_rate": 100.0,
+    "skipped": false
+  },
+  "failures": [
+    {
+      "case_id": "gold-004",
+      "stage": "semantic_match",
+      "detail": "{\"intent\": \"failure_trend\", \"data_source_type\": \"postgresql\", \"analysis_type\": \"failure_trend\", \"filters\": {\"days\": 30, \"project_name\": \"风控系统\"}, \"top_n\": null, \"required_columns\": [\"request_time\", \"status\", \"project_name\"], \"need_chart\": true, \"need_report\": true}"
+    },
+    {
+      "case_id": "gold-011",
+      "stage": "semantic_match",
+      "detail": "{\"intent\": \"average_latency\", \"data_source_type\": \"postgresql\", \"analysis_type\": \"average_latency\", \"filters\": {}, \"top_n\": 3, \"required_columns\": [\"api_name\", \"status\", \"latency_ms\"], \"need_chart\": true, \"need_report\": true}"
+    },
+    {
+      "case_id": "gold-016",
+      "stage": "semantic_match",
+      "detail": "{\"intent\": \"failure_trend\", \"data_source_type\": \"postgresql\", \"analysis_type\": \"failure_trend\", \"filters\": {\"days\": 7}, \"top_n\": null, \"required_columns\": [\"request_time\", \"status\"], \"need_chart\": true, \"need_report\": true}"
+    },
+    {
+      "case_id": "gold-020",
+      "stage": "semantic_match",
+      "detail": "{\"intent\": \"api_failure_topn\", \"data_source_type\": \"postgresql\", \"analysis_type\": \"api_failure_topn\", \"filters\": {\"api_name\": \"/api/health\"}, \"top_n\": 10, \"required_columns\": [\"api_name\", \"status\", \"latency_ms\"], \"need_chart\": true, \"need_report\": true}"
+    },
+    {
+      "case_id": "gold-022",
+      "stage": "semantic_match",
+      "detail": "{\"intent\": \"department_call_volume_trend\", \"data_source_type\": \"postgresql\", \"analysis_type\": \"department_call_volume_trend\", \"filters\": {\"department\": \"销售部\", \"days\": 7}, \"top_n\": null, \"required_columns\": [\"request_time\", \"department\", \"status\"], \"need_chart\": true, \"need_report\": true}"
+    },
+    {
+      "case_id": "gold-024",
+      "stage": "semantic_match",
+      "detail": "{\"intent\": \"failure_trend\", \"data_source_type\": \"postgresql\", \"analysis_type\": \"failure_trend\", \"filters\": {\"days\": 30, \"api_name\": \"/api/gateway/route\"}, \"top_n\": null, \"required_columns\": [\"request_time\", \"status\", \"api_name\"], \"need_chart\": true, \"need_report\": true}"
+    }
+  ]
+}

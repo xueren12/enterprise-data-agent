@@ -1,0 +1,24 @@
+{"case_id":"gold-001","question":"帮我看看销售团队的接口失败情况，按部门汇总一下。","expected_plan":{"intent":"department_failure_rate","filters":{"department":"销售部"},"top_n":null}}
+{"case_id":"gold-002","question":"财务部最近一周的调用失败率是多少？","expected_plan":{"intent":"department_failure_rate","filters":{"department":"财务部","days":7},"top_n":null}}
+{"case_id":"gold-003","question":"请生成运维中心接口失败率的部门分析报告。","expected_plan":{"intent":"department_failure_rate","filters":{"department":"运维部"},"top_n":null}}
+{"case_id":"gold-004","question":"风控系统近 30 天的整体失败率如何？","expected_plan":{"intent":"department_failure_rate","filters":{"project_name":"风控系统","days":30},"top_n":null}}
+{"case_id":"gold-005","question":"列出平台部最容易失败的 3 个接口。","expected_plan":{"intent":"api_failure_topn","filters":{"department":"平台部"},"top_n":3}}
+{"case_id":"gold-006","question":"最近 14 天销售部失败率最高的接口前五名。","expected_plan":{"intent":"api_failure_topn","filters":{"department":"销售部","days":14},"top_n":5}}
+{"case_id":"gold-007","question":"财务系统哪些 API 错误最多？给我 Top10。","expected_plan":{"intent":"api_failure_topn","filters":{"project_name":"财务系统"},"top_n":10}}
+{"case_id":"gold-008","question":"请找出 /api/risk/score 这个接口的失败率。","expected_plan":{"intent":"api_failure_topn","filters":{"api_name":"/api/risk/score"},"top_n":10}}
+{"case_id":"gold-009","question":"哪些接口最慢？返回平均耗时最高的前 5 个。","expected_plan":{"intent":"average_latency","filters":{},"top_n":5}}
+{"case_id":"gold-010","question":"看看运维部最近 30 天响应时间最高的接口。","expected_plan":{"intent":"average_latency","filters":{"department":"运维部","days":30},"top_n":10}}
+{"case_id":"gold-011","question":"网关平台的 API 平均延迟排行前 3。","expected_plan":{"intent":"average_latency","filters":{"project_name":"网关平台"},"top_n":3}}
+{"case_id":"gold-012","question":"销售部 /api/order/create 的平均耗时是多少？","expected_plan":{"intent":"average_latency","filters":{"department":"销售部","api_name":"/api/order/create"},"top_n":10}}
+{"case_id":"gold-013","question":"画出最近 7 天各接口失败率的每日走势。","expected_plan":{"intent":"failure_trend","filters":{"days":7},"top_n":null}}
+{"case_id":"gold-014","question":"我想观察财务部本月的失败率趋势。","expected_plan":{"intent":"failure_trend","filters":{"department":"财务部","days":30},"top_n":null}}
+{"case_id":"gold-015","question":"/api/risk/rule/check 在过去 14 天失败是否有波动？","expected_plan":{"intent":"failure_trend","filters":{"api_name":"/api/risk/rule/check","days":14},"top_n":null}}
+{"case_id":"gold-016","question":"展示网关平台每天的调用失败率曲线。","expected_plan":{"intent":"failure_trend","filters":{"project_name":"网关平台"},"top_n":null}}
+{"case_id":"gold-017","question":"各部门调用接口的次数分别是多少？","expected_plan":{"intent":"department_call_volume","filters":{},"top_n":null}}
+{"case_id":"gold-018","question":"近 30 天销售部总共调用了多少次接口？","expected_plan":{"intent":"department_call_volume","filters":{"department":"销售部","days":30},"top_n":null}}
+{"case_id":"gold-019","question":"财务系统的调用量帮我汇总下。","expected_plan":{"intent":"department_call_volume","filters":{"project_name":"财务系统"},"top_n":null}}
+{"case_id":"gold-020","question":"/api/health 被调用过多少次？","expected_plan":{"intent":"department_call_volume","filters":{"api_name":"/api/health"},"top_n":null}}
+{"case_id":"gold-021","question":"分析最近一周各部门调用量的变化趋势。","expected_plan":{"intent":"department_call_volume_trend","filters":{"days":7},"top_n":null}}
+{"case_id":"gold-022","question":"销售部每天的接口调用量走势给我看一下。","expected_plan":{"intent":"department_call_volume_trend","filters":{"department":"销售部"},"top_n":null}}
+{"case_id":"gold-023","question":"财务系统近 14 天的接口调用量变化。","expected_plan":{"intent":"department_call_volume_trend","filters":{"project_name":"财务系统","days":14},"top_n":null}}
+{"case_id":"gold-024","question":"请按日展示 /api/gateway/route 最近 30 天的调用次数。","expected_plan":{"intent":"department_call_volume_trend","filters":{"api_name":"/api/gateway/route","days":30},"top_n":null}}

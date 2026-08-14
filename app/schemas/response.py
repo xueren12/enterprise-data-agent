@@ -8,7 +8,6 @@ class AgentQueryResponse(BaseModel):
     question: str = Field(description="用户提交的原始问题。")
     status: Literal["success", "failed"] = Field(description="本次执行状态。")
     report: str | None = Field(description="生成的结构化分析报告。")
-    chart_path: str | None = Field(description="生成的图表文件路径。")
     error: str | None = Field(description="执行失败时的友好错误信息。")
     task_url: str | None = Field(default=None, description="完整任务详情接口地址。")
     report_url: str | None = Field(default=None, description="报告内容接口地址。")

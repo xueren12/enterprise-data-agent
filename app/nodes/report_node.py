@@ -21,7 +21,7 @@ def generate_report_node(state: AgentState) -> AgentState:
         {
             "question": state["user_question"],
             "analysis_result": analysis_result,
-            "chart_path": chart_result["chart_path"],
+            "chart_url": f"/agent/chart/{state['trace_id']}",
             "trace_id": state["trace_id"],
             "analysis_type": state["intent"],
         }

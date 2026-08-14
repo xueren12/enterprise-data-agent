@@ -8,7 +8,9 @@
 - 不允许使用 SELECT *；
 - 不允许生成 INSERT、UPDATE、DELETE、DDL、注释或多语句；
 - 查询原始明细数据，分析聚合由 Pandas 完成；
-- 必须包含 LIMIT，最大 200；
+- WHERE 只能包含 QueryPlan 的 filters，绝不能自行增加 status 等条件；
+- 不允许 ORDER BY；TopN 排序必须由 Pandas 完成；
+- LIMIT 必须为 200，不能使用 TopN 数值作为 LIMIT；
 - 只输出 SQL，不要输出解释或 Markdown 代码块。
 
 用户问题：

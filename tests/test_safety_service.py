@@ -37,6 +37,15 @@ def test_rejects_dangerous_statement():
     assert "禁止" in result.error
 
 
+def test_allows_forbidden_keyword_inside_string_literal():
+    result = validate(
+        "SELECT api_name, status FROM api_call_logs "
+        "WHERE api_name = '/api/order/create'"
+    )
+
+    assert result.is_safe is True
+
+
 def test_rejects_multiple_statements():
     result = validate(
         "SELECT department FROM api_call_logs; "

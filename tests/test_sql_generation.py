@@ -83,6 +83,19 @@ def test_sql_plan_validation_rejects_missing_columns_and_filters():
     assert "缺少查询计划要求的筛选条件" in missing_filter_error
 
 
+def test_sql_plan_validation_rejects_unplanned_filter_order_and_small_limit():
+    error = validate_sql_matches_plan(
+        "SELECT api_name, status, latency_ms, request_time, department "
+        "FROM api_call_logs WHERE department = '运维部' AND status = 'failed' "
+        "ORDER BY latency_ms DESC LIMIT 5",
+        required_columns=QUERY_PLAN["required_columns"],
+        filters={"department": "运维部"},
+        min_limit=200,
+    )
+
+    assert "未声明的筛选字段：status" in error
+
+
 def test_sql_plan_validation_accepts_fallback_sql():
     sql = llm_service.fallback_select_sql(QUERY_PLAN)
 

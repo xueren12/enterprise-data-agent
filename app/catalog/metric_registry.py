@@ -76,3 +76,17 @@ def get_metric_definition(metric_name: str) -> MetricDefinition:
     if metric_name not in METRIC_REGISTRY:
         raise ValueError(f"未注册的分析指标：{metric_name}")
     return METRIC_REGISTRY[metric_name]
+
+
+def get_metric_prompt_summary() -> str:
+    """返回可直接放入规划提示词的受控指标目录。"""
+    lines: list[str] = []
+    for metric in METRIC_REGISTRY.values():
+        lines.append(
+            "- "
+            f"{metric.name}：{metric.display_name}；"
+            f"必需字段 {', '.join(metric.required_columns)}；"
+            f"允许筛选 {', '.join(sorted(metric.allowed_filters))}；"
+            f"默认 TopN {metric.default_top_n or 'null'}。"
+        )
+    return "\n".join(lines)

@@ -1,0 +1,27 @@
+{
+  "mode": "rule_safety_with_postgresql",
+  "generated_at": "2026-08-14T14:31:25.502669+00:00",
+  "disclaimer": "这是确定性规则与受控 SQL 回归集，不代表 LLM 自然语言理解准确率。",
+  "rule_plan": {
+    "total": 150,
+    "success": 150,
+    "success_rate": 100.0
+  },
+  "controlled_sql_validation": {
+    "total": 150,
+    "success": 150,
+    "success_rate": 100.0
+  },
+  "controlled_sql_execution": {
+    "attempted": 150,
+    "success": 150,
+    "success_rate": 100.0,
+    "skipped": false
+  },
+  "fallback": {
+    "total": 12,
+    "success": 12,
+    "success_rate": 100.0
+  },
+  "failures": []
+}

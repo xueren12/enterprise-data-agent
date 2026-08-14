@@ -42,7 +42,7 @@ class ChartGenerateInput(BaseModel):
 class ReportGenerateInput(BaseModel):
     question: str = Field(description="用户原始问题。")
     analysis_result: list[dict] = Field(description="各部门失败率分析结果。")
-    chart_path: str = Field(description="已生成的图表路径。")
+    chart_url: str = Field(description="图表的公开访问地址。")
     trace_id: str = Field(description="本次 Agent 执行的追踪 ID。")
     analysis_type: str = Field(description="当前分析类型。")
 
@@ -177,7 +177,7 @@ def _chart_generate_tool_impl(
 def _report_generate_tool_impl(
     question: str,
     analysis_result: list[dict],
-    chart_path: str,
+    chart_url: str,
     trace_id: str,
     analysis_type: str,
 ) -> dict:
@@ -186,13 +186,13 @@ def _report_generate_tool_impl(
         report = generate_analysis_report(
             question=question,
             analysis_result=analysis_result,
-            chart_path=chart_path,
+            chart_url=chart_url,
             analysis_type=analysis_type,
         )
         llm_result = generate_report_with_llm(
             question=question,
             analysis_result=analysis_result,
-            chart_path=chart_path,
+            chart_url=chart_url,
             fallback_report=report,
         )
         final_report = llm_result["content"]
@@ -203,7 +203,7 @@ def _report_generate_tool_impl(
             tool_args={
                 "question": question,
                 "analysis_result": analysis_result,
-                "chart_path": chart_path,
+                "chart_url": chart_url,
                 "analysis_type": analysis_type,
             },
             tool_result_summary={
@@ -229,7 +229,7 @@ def _report_generate_tool_impl(
             tool_args={
                 "question": question,
                 "analysis_result": analysis_result,
-                "chart_path": chart_path,
+                "chart_url": chart_url,
                 "analysis_type": analysis_type,
             },
             error=error,
@@ -262,7 +262,7 @@ chart_generate_tool = StructuredTool.from_function(
 report_generate_tool = StructuredTool.from_function(
     func=_report_generate_tool_impl,
     name="report_generate_tool",
-    description="根据用户问题、分析结果和图表路径生成并保存结构化业务分析报告。",
+    description="根据用户问题、分析结果和图表公开地址生成并保存结构化业务分析报告。",
     args_schema=ReportGenerateInput,
 )
 

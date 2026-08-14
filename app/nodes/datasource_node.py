@@ -1,12 +1,8 @@
 from app.config import DATABASE_URL, DEFAULT_DATA_SOURCE, SAMPLE_API_LOGS_PATH
-from app.nodes.parse_node import SUPPORTED_INTENTS
 from app.state import AgentState
 
 
 def select_datasource_node(state: AgentState) -> AgentState:
-    if state["intent"] not in SUPPORTED_INTENTS:
-        return {**state, "error": "未能选择数据源：当前问题意图暂不支持。"}
-
     question = state["user_question"].lower()
     explicitly_requests_database = any(
         keyword in question for keyword in ("数据库", "postgresql", "postgres", "sql")

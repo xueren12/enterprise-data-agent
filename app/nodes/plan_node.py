@@ -9,9 +9,7 @@ from app.state import AgentState
 def generate_plan_node(state: AgentState) -> AgentState:
     plan_result = generate_query_plan(
         state["user_question"],
-        state["intent"],
         state["data_source_type"],
-        state.get("analysis_params", {}),
     )
     log_event(
         trace_id=state["trace_id"],
@@ -26,8 +24,15 @@ def generate_plan_node(state: AgentState) -> AgentState:
         error=None if plan_result["used_llm"] else plan_result["error"],
     )
     plan = plan_result["content"]
+    if plan is None:
+        return {**state, "error": plan_result["error"]}
+    analysis_params = dict(plan.filters)
+    if plan.top_n is not None:
+        analysis_params["top_n"] = plan.top_n
     return {
         **state,
+        "intent": plan.intent,
+        "analysis_params": analysis_params,
         "query_plan": plan.model_dump(),
         "error": None,
     }

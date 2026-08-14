@@ -184,7 +184,6 @@ def query_agent(request: AgentQueryRequest) -> AgentQueryResponse:
             "question": request.question,
             "status": "running",
             "report": None,
-            "chart_path": None,
             "error": None,
         }
     )
@@ -196,6 +195,7 @@ def query_agent(request: AgentQueryRequest) -> AgentQueryResponse:
             "question": request.question,
             "status": "failed" if error else "success",
             "report": result.get("report") or None,
+            # 仅持久化供 /agent/chart 读取；响应模型不会暴露本机绝对路径。
             "chart_path": result.get("chart_path") or None,
             "error": error,
             "data_source": result.get("data_source"),
@@ -226,7 +226,6 @@ def query_agent(request: AgentQueryRequest) -> AgentQueryResponse:
             "question": request.question,
             "status": "failed",
             "report": None,
-            "chart_path": None,
             "error": error,
             **build_artifact_urls(
                 trace_id,

@@ -40,16 +40,13 @@ def _extract_filters(question: str) -> dict:
     return params
 
 
-def parse_question_node(state: AgentState) -> AgentState:
-    question = state["user_question"].strip()
-    if not question:
-        return {**state, "error": "用户问题为空，请输入需要分析的问题。"}
-
+def infer_intent_and_params(question: str) -> tuple[str, dict]:
+    """为模型不可用或输出无效时提供确定性兜底。"""
     normalized = question.lower()
     params = _extract_filters(question)
 
     if (
-        ("调用量" in question or "调用次数" in question)
+        ("调用量" in question or "调用次数" in question or "调用了" in question or "被调用" in question)
         and any(word in question for word in ("趋势", "变化", "走势", "按天", "每日"))
     ):
         intent = "department_call_volume_trend"
@@ -61,7 +58,7 @@ def parse_question_node(state: AgentState) -> AgentState:
     elif any(word in question for word in ("响应时间", "平均耗时", "延迟", "耗时")):
         intent = "average_latency"
         params.setdefault("top_n", _extract_top_n(question))
-    elif "调用量" in question or "调用次数" in question:
+    elif any(word in question for word in ("调用量", "调用次数", "调用了", "被调用")):
         intent = "department_call_volume"
     elif (
         ("接口" in question and any(word in normalized for word in ("top", "最高")))
@@ -74,18 +71,21 @@ def parse_question_node(state: AgentState) -> AgentState:
         if "top" in normalized or "前" in question:
             params.setdefault("top_n", _extract_top_n(question))
     else:
-        return {
-            **state,
-            "intent": "unknown",
-            "analysis_params": {},
-            "error": (
-                "暂时支持失败率、失败接口 TopN、平均响应时间、失败趋势和部门调用量分析。"
-            ),
-        }
+        return "unknown", {}
+
+    return intent, params
+
+
+def parse_question_node(state: AgentState) -> AgentState:
+    """仅校验输入；业务规划由下一节点的 LLM 完成。"""
+    question = state["user_question"].strip()
+    if not question:
+        return {**state, "error": "用户问题为空，请输入需要分析的问题。"}
 
     return {
         **state,
-        "intent": intent,
-        "analysis_params": params,
+        "user_question": question,
+        "intent": "",
+        "analysis_params": {},
         "error": None,
     }

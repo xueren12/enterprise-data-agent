@@ -64,7 +64,7 @@ def test_postgresql_retries_once_then_succeeds(monkeypatch):
         repair_calls.append(kwargs)
         return {
             "used_llm": True,
-            "content": "SELECT department, status FROM api_call_logs LIMIT 20",
+            "content": "SELECT department, status FROM api_call_logs LIMIT 200",
             "error": None,
         }
 

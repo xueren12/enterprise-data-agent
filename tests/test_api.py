@@ -29,7 +29,7 @@ def test_query_agent_success(monkeypatch):
     assert body["question"] == "统计各部门接口调用失败率"
     assert body["status"] == "success"
     assert body["report"] == "测试分析报告"
-    assert body["chart_path"] == "charts/test.png"
+    assert "chart_path" not in body
     assert body["error"] is None
     assert body["task_url"] == f"/agent/task/{body['trace_id']}"
     assert body["report_url"] == f"/agent/report/{body['trace_id']}"
@@ -56,7 +56,7 @@ def test_query_agent_failed(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "failed"
-    assert body["chart_path"] is None
+    assert "chart_path" not in body
     assert body["error"] == "暂时只支持接口调用失败率分析。"
     assert body["task_url"] == f"/agent/task/{body['trace_id']}"
     assert body["report_url"] == f"/agent/report/{body['trace_id']}"
@@ -86,6 +86,7 @@ def test_get_task_and_report(monkeypatch):
 
     assert task_response.status_code == 200
     assert task_response.json()["intent"] == "department_failure_rate"
+    assert "chart_path" not in task_response.json()
     assert report_response.status_code == 200
     assert report_response.text == "报告内容"
 

@@ -47,7 +47,8 @@ class QueryPlan(BaseModel):
     @field_validator("filters")
     @classmethod
     def validate_filters(cls, value: dict[str, Any]) -> dict[str, Any]:
-        normalized = dict(value)
+        # 部分模型会把未使用的可选条件输出为 null，将其视为未提供。
+        normalized = {name: item for name, item in value.items() if item is not None}
         if "days" in normalized:
             days = normalized["days"]
             if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 3650:
@@ -67,6 +68,11 @@ class QueryPlan(BaseModel):
         if self.intent != self.analysis_type:
             raise ValueError("intent 与 analysis_type 必须一致。")
         metric = get_metric_definition(self.analysis_type)
+        if self.top_n is None and metric.default_top_n is not None:
+            self.top_n = metric.default_top_n
+        # 图表和报告属于指标口径，不信任模型的自由开关值。
+        self.need_chart = metric.need_chart
+        self.need_report = metric.need_report
         missing = set(metric.required_columns) - set(
             self.required_columns
         )
@@ -78,12 +84,10 @@ class QueryPlan(BaseModel):
             self.filters,
             allowed_filters=metric.allowed_filters,
         )
-        missing_filter_columns = set(columns_for_filters(self.filters)) - set(
-            self.required_columns
-        )
+        missing_filter_columns = set(columns_for_filters(self.filters)) - set(self.required_columns)
         if missing_filter_columns:
-            raise ValueError(
-                "required_columns 缺少筛选所需字段："
-                f"{', '.join(sorted(missing_filter_columns))}"
+            # 选择列由受控 Registry 推导，而不是由模型决定是否读取筛选字段。
+            self.required_columns = validate_query_columns(
+                self.required_columns + sorted(missing_filter_columns)
             )
         return self

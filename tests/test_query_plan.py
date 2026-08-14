@@ -22,9 +22,7 @@ def test_generate_query_plan_uses_valid_structured_llm_output(monkeypatch):
 
     result = llm_service.generate_query_plan(
         "统计运维部失败率最高的接口 Top5",
-        "api_failure_topn",
         "csv",
-        {"department": "运维部", "top_n": 5},
     )
 
     assert result["used_llm"] is True
@@ -40,9 +38,7 @@ def test_generate_query_plan_falls_back_when_llm_json_is_invalid(monkeypatch):
 
     result = llm_service.generate_query_plan(
         "统计最近 30 天各部门失败率",
-        "department_failure_rate",
         "postgresql",
-        {"days": 30},
     )
 
     plan = result["content"]
@@ -58,14 +54,14 @@ def test_generate_query_plan_falls_back_when_llm_json_is_invalid(monkeypatch):
     ]
 
 
-def test_generate_query_plan_rejects_llm_overriding_rule_result(monkeypatch):
+def test_generate_query_plan_allows_llm_to_plan_within_registry(monkeypatch):
     response = {
         "intent": "average_latency",
         "data_source_type": "csv",
         "analysis_type": "average_latency",
         "filters": {"department": "财务部"},
         "top_n": 20,
-        "required_columns": ["api_name", "latency_ms", "department"],
+        "required_columns": ["api_name", "status", "latency_ms", "department"],
         "need_chart": True,
         "need_report": True,
     }
@@ -77,13 +73,31 @@ def test_generate_query_plan_rejects_llm_overriding_rule_result(monkeypatch):
 
     result = llm_service.generate_query_plan(
         "统计运维部失败率最高的接口 Top5",
-        "api_failure_topn",
         "csv",
-        {"department": "运维部", "top_n": 5},
     )
 
     plan = result["content"]
-    assert result["used_llm"] is False
-    assert plan.intent == "api_failure_topn"
-    assert plan.filters == {"department": "运维部"}
-    assert plan.top_n == 5
+    assert result["used_llm"] is True
+    assert plan.intent == "average_latency"
+    assert plan.filters == {"department": "财务部"}
+    assert plan.top_n == 20
+
+
+def test_query_plan_registry_normalizes_execution_fields_and_output_flags():
+    plan = llm_service.QueryPlan.model_validate(
+        {
+            "intent": "failure_trend",
+            "data_source_type": "csv",
+            "analysis_type": "failure_trend",
+            "filters": {"days": 7, "api_name": None},
+            "top_n": None,
+            "required_columns": ["request_time", "status"],
+            "need_chart": False,
+            "need_report": False,
+        }
+    )
+
+    assert plan.filters == {"days": 7}
+    assert plan.required_columns == ["request_time", "status"]
+    assert plan.need_chart is True
+    assert plan.need_report is True

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.nodes.parse_node import parse_question_node
+from app.nodes.parse_node import infer_intent_and_params, parse_question_node
 from app.tools.pandas_tool import analyze_api_logs
 from app.tools.report_tool import generate_analysis_report
 
@@ -53,7 +53,15 @@ def base_state(question: str) -> dict:
     }
 
 
-def test_parse_supported_intents():
+def test_parse_question_only_validates_input():
+    result = parse_question_node(base_state("统计各部门失败率"))
+
+    assert result["intent"] == ""
+    assert result["analysis_params"] == {}
+    assert result["error"] is None
+
+
+def test_fallback_rule_infers_supported_intents():
     questions = {
         "统计各部门失败率": "department_failure_rate",
         "找出失败率最高的接口 Top5": "api_failure_topn",
@@ -64,22 +72,21 @@ def test_parse_supported_intents():
     }
 
     for question, expected_intent in questions.items():
-        result = parse_question_node(base_state(question))
-        assert result["intent"] == expected_intent
-        assert result["error"] is None
+        intent, _ = infer_intent_and_params(question)
+        assert intent == expected_intent
 
 
-def test_parse_top_n():
-    result = parse_question_node(base_state("找出失败率最高的接口 Top5"))
+def test_fallback_rule_extracts_top_n():
+    _, result = infer_intent_and_params("找出失败率最高的接口 Top5")
 
-    assert result["analysis_params"]["top_n"] == 5
+    assert result["top_n"] == 5
 
 
-def test_parse_unrelated_trend_question_uses_fallback():
-    result = parse_question_node(base_state("分析股票价格走势"))
+def test_fallback_rule_rejects_unrelated_question():
+    intent, params = infer_intent_and_params("分析股票价格走势")
 
-    assert result["intent"] == "unknown"
-    assert result["error"] is not None
+    assert intent == "unknown"
+    assert params == {}
 
 
 def test_all_analysis_types_return_results():
@@ -119,15 +126,15 @@ def test_failure_trend_accepts_its_minimum_query_plan_columns():
 
 
 def test_days_and_department_filters():
-    result = parse_question_node(base_state("分析最近30天销售部接口失败率趋势"))
+    intent, params = infer_intent_and_params("分析最近30天销售部接口失败率趋势")
     analysis = analyze_api_logs(
         pd.DataFrame(SAMPLE_ROWS),
-        result["intent"],
-        **result["analysis_params"],
+        intent,
+        **params,
     )
 
-    assert result["analysis_params"]["days"] == 30
-    assert result["analysis_params"]["department"] == "销售部"
+    assert params["days"] == 30
+    assert params["department"] == "销售部"
     assert all(row["date"] == "2026-05-01" for row in analysis)
 
 
@@ -148,7 +155,7 @@ def test_report_explains_tied_failure_rate_leaders():
                 "failure_rate": 50.0,
             },
         ],
-        chart_path="chart.png",
+        chart_url="/agent/chart/test",
         analysis_type="department_failure_rate",
     )
 

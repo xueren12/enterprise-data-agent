@@ -21,6 +21,7 @@ def validate_sql_node(state: AgentState) -> AgentState:
             validation.sql,
             required_columns=plan["required_columns"],
             filters=plan["filters"],
+            min_limit=SQL_MAX_LIMIT,
         )
 
     if validation.is_safe and not plan_error:

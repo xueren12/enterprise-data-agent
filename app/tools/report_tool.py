@@ -16,7 +16,7 @@ INTENT_NAMES = {
 def generate_analysis_report(
     question: str,
     analysis_result: list[dict],
-    chart_path: str,
+    chart_url: str,
     analysis_type: str,
 ) -> str:
     if not analysis_result:
@@ -99,20 +99,20 @@ def generate_analysis_report(
         "结果已按核心指标排序，排名靠前的对象需要优先关注。\n\n"
         "## 业务建议\n"
         "建议结合错误码、错误信息、发布时间和流量变化进一步定位原因。\n\n"
-        "## 图表路径\n"
-        f"{Path(chart_path)}"
+        "## 图表\n"
+        f"{chart_url}"
     )
 
 
 def generate_failure_rate_report(
     question: str,
     analysis_result: list[dict],
-    chart_path: str,
+    chart_url: str,
 ) -> str:
     return generate_analysis_report(
         question,
         analysis_result,
-        chart_path,
+        chart_url,
         "department_failure_rate",
     )
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,23 +15,6 @@ from app.catalog.schema_registry import (
     list_queryable_tables,
 )
 from app.catalog.field_resolver import resolve_filter_field
-
-FORBIDDEN_SQL_KEYWORDS = {
-    "DROP",
-    "DELETE",
-    "UPDATE",
-    "INSERT",
-    "ALTER",
-    "TRUNCATE",
-    "CREATE",
-    "GRANT",
-    "REVOKE",
-    "EXEC",
-    "EXECUTE",
-    "MERGE",
-    "CALL",
-    "COPY",
-}
 
 FORBIDDEN_SQL_FUNCTIONS = {
     "PG_SLEEP",
@@ -57,6 +39,7 @@ def validate_sql_matches_plan(
     *,
     required_columns: list[str],
     filters: dict[str, Any],
+    min_limit: int | None = None,
 ) -> str | None:
     try:
         statement = parse(sql, read="postgres")[0]
@@ -80,23 +63,41 @@ def validate_sql_matches_plan(
     where = statement.args.get("where")
     if filters and where is None:
         return "SQL 缺少查询计划要求的筛选条件。"
-    if where is None:
-        return None
+    if where is not None:
+        where_columns = {
+            column.name.lower() for column in where.find_all(exp.Column)
+        }
+        expected_where_columns = {
+            resolve_filter_field(filter_name).lower() for filter_name in filters
+        }
+        unexpected_where_columns = where_columns - expected_where_columns
+        if unexpected_where_columns:
+            return (
+                "SQL 包含 QueryPlan 未声明的筛选字段："
+                f"{', '.join(sorted(unexpected_where_columns))}"
+            )
+        for filter_name, expected_value in filters.items():
+            column = resolve_filter_field(filter_name)
+            if column not in where_columns:
+                return f"SQL 缺少筛选字段：{column}"
 
-    where_columns = {
-        column.name.lower() for column in where.find_all(exp.Column)
-    }
-    for filter_name, expected_value in filters.items():
-        column = resolve_filter_field(filter_name)
-        if column not in where_columns:
-            return f"SQL 缺少筛选字段：{column}"
+            where_sql = where.sql(dialect="postgres")
+            if filter_name == "days":
+                if f"{expected_value} day" not in where_sql.lower():
+                    return f"SQL 未正确应用最近 {expected_value} 天筛选。"
+            elif str(expected_value) not in where_sql:
+                return f"SQL 未正确应用筛选条件：{filter_name}"
 
-        where_sql = where.sql(dialect="postgres")
-        if filter_name == "days":
-            if f"{expected_value} day" not in where_sql.lower():
-                return f"SQL 未正确应用最近 {expected_value} 天筛选。"
-        elif str(expected_value) not in where_sql:
-            return f"SQL 未正确应用筛选条件：{filter_name}"
+    if statement.args.get("order") is not None:
+        return "SQL 不允许在 Pandas 分析前排序，TopN 必须由分析节点计算。"
+
+    if min_limit is not None:
+        limit = statement.args.get("limit")
+        limit_expression = limit.expression if limit is not None else None
+        if not isinstance(limit_expression, exp.Literal) or not limit_expression.is_int:
+            return "SQL LIMIT 不符合受控查询要求。"
+        if int(limit_expression.this) < min_limit:
+            return f"SQL LIMIT 不能小于受控查询上限 {min_limit}。"
     return None
 
 
@@ -117,10 +118,6 @@ def validate_select_sql(
     if ";" in normalized_sql.rstrip(";"):
         return SqlValidationResult(False, "", "SQL 不允许执行多条语句。")
 
-    keyword_pattern = r"\b(" + "|".join(sorted(FORBIDDEN_SQL_KEYWORDS)) + r")\b"
-    if re.search(keyword_pattern, normalized_sql, flags=re.IGNORECASE):
-        return SqlValidationResult(False, "", "SQL 包含禁止的 DDL/DML 关键字。")
-
     try:
         statements = parse(normalized_sql, read="postgres")
     except ParseError as exc:
@@ -131,7 +128,7 @@ def validate_select_sql(
 
     statement = statements[0]
     if not isinstance(statement, exp.Query):
-        return SqlValidationResult(False, "", "只允许执行 SELECT 查询。")
+        return SqlValidationResult(False, "", "只允许执行 SELECT 查询，禁止 DDL/DML 操作。")
 
     dangerous_nodes = (
         exp.Insert,

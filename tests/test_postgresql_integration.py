@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_postgresql_loads_same_40_row_synthetic_dataset():
+def test_postgresql_loads_large_synthetic_dataset():
     engine = create_engine(INTEGRATION_DATABASE_URL)
     try:
         with engine.connect() as connection:
@@ -24,7 +24,7 @@ def test_postgresql_loads_same_40_row_synthetic_dataset():
     finally:
         engine.dispose()
 
-    assert count == 40
+    assert count >= 5_000
 
 
 def test_readonly_application_role_cannot_insert_records():

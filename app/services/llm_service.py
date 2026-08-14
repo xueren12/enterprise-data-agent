@@ -17,7 +17,7 @@ from app.catalog.field_resolver import (
     resolve_filter_field,
     validate_filter_fields,
 )
-from app.catalog.metric_registry import get_metric_definition
+from app.catalog.metric_registry import get_metric_definition, get_metric_prompt_summary
 from app.catalog.schema_registry import get_queryable_columns, get_table
 from app.schemas.query_plan import QueryPlan
 
@@ -89,6 +89,21 @@ def fallback_query_plan(
     )
 
 
+def fallback_query_plan_from_question(
+    question: str,
+    data_source_type: str,
+) -> QueryPlan:
+    """模型故障后的离线规则规划路径，不参与正常模型规划。"""
+    from app.nodes.parse_node import SUPPORTED_INTENTS, infer_intent_and_params
+
+    intent, params = infer_intent_and_params(question)
+    if intent not in SUPPORTED_INTENTS:
+        raise ValueError(
+            "暂时支持失败率、失败接口 TopN、平均响应时间、失败趋势和部门调用量分析。"
+        )
+    return fallback_query_plan(intent, data_source_type, params)
+
+
 def _extract_json_object(content: str) -> dict[str, Any]:
     cleaned = content.strip()
     if cleaned.startswith("```"):
@@ -118,6 +133,18 @@ def _catalog_prompt_summary(table_name: str = "api_call_logs") -> str:
         if field_name in queryable_columns:
             lines.append(f"- {field_name}：{field.description}，类型 {field.type}")
     return "\n".join(lines)
+
+
+def _dimension_prompt_summary() -> str:
+    """演示数据的受控维度值，帮助模型选择正确的筛选字段。"""
+    return "\n".join(
+        (
+            "部门：销售部、财务部、运维部、风控部、平台部。",
+            "项目：客户关系系统、财务系统、运维中心、风控系统、网关平台。",
+            "接口：/api/customer/search、/api/order/create、/api/order/list、/api/invoice/create、/api/payment/reconcile、/api/budget/query、/api/device/heartbeat、/api/device/event、/api/alert/create、/api/risk/score、/api/risk/rule/check、/api/risk/report、/api/auth/token、/api/gateway/route、/api/health。",
+            "筛选字段必须匹配实体类型：部门用 department，项目用 project_name，接口用 api_name。",
+        )
+    )
 
 
 def fallback_select_sql(query_plan: QueryPlan | dict[str, Any]) -> str:
@@ -202,37 +229,30 @@ def repair_select_sql(
         }
 
 
-def generate_query_plan(
-    question: str,
-    intent: str,
-    data_source_type: str,
-    analysis_params: dict[str, Any] | None = None,
-) -> dict:
-    fallback_plan = fallback_query_plan(intent, data_source_type, analysis_params)
+def generate_query_plan(question: str, data_source_type: str) -> dict:
+    """让模型在 Registry 白名单内规划，失败时才使用规则兜底。"""
     prompt = read_prompt("query_plan_prompt.txt").format(
         question=question,
-        intent=intent,
         data_source_type=data_source_type,
         catalog_fields=_catalog_prompt_summary(),
-        analysis_params=json.dumps(
-            analysis_params or {},
-            ensure_ascii=False,
-            sort_keys=True,
-        ),
+        metric_definitions=get_metric_prompt_summary(),
+        dimension_values=_dimension_prompt_summary(),
     )
     try:
-        content = call_deepseek(prompt)
+        content = call_deepseek(prompt, temperature=0)
         plan = QueryPlan.model_validate(_extract_json_object(content))
         if plan.data_source_type != data_source_type:
             raise ValueError("模型计划的数据源与系统已选择的数据源不一致。")
-        expected_params = dict(analysis_params or {})
-        expected_top_n = expected_params.pop("top_n", None)
-        if plan.intent != intent or plan.analysis_type != intent:
-            raise ValueError("模型计划不得覆盖规则解析出的意图。")
-        if plan.filters != expected_params or plan.top_n != expected_top_n:
-            raise ValueError("模型计划不得覆盖规则解析出的筛选参数。")
         return {"used_llm": True, "content": plan, "error": None}
     except Exception as exc:
+        try:
+            fallback_plan = fallback_query_plan_from_question(question, data_source_type)
+        except Exception as fallback_exc:
+            return {
+                "used_llm": False,
+                "content": None,
+                "error": f"模型规划失败：{exc}；规则兜底失败：{fallback_exc}",
+            }
         return {
             "used_llm": False,
             "content": fallback_plan,
@@ -244,13 +264,13 @@ def generate_report_with_llm(
     *,
     question: str,
     analysis_result: list[dict],
-    chart_path: str,
+    chart_url: str,
     fallback_report: str,
 ) -> dict:
     prompt = read_prompt("report_prompt.txt").format(
         question=question,
         analysis_result=json.dumps(analysis_result, ensure_ascii=False, indent=2),
-        chart_path=chart_path,
+        chart_url=chart_url,
     )
     try:
         content = call_deepseek(prompt)
